@@ -7,8 +7,6 @@ comments: false
 tag : PHP
 ---
 
-# PHP + nginx + mysql @ docker로 게시판 구현하기 
-
 ## Overview
 
 이번 프로젝트의 목표는 크게 3가지로 나눌 수 있을 것 같다.

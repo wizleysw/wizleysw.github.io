@@ -9,18 +9,18 @@
   <head>
     <meta charset="utf-8">
 
-<!-- begin _includes/seo.html --><title>HelloWorld! - 위즐리 블로그</title>
+<!-- begin _includes/seo.html --><title>Posts by Tag - 위즐리 블로그</title>
 <meta name="description" content="HelloWorld! ">
 
 
   <meta name="author" content="Wizley">
 
 
-<meta property="og:type" content="article">
+<meta property="og:type" content="website">
 <meta property="og:locale" content="ko_KR">
 <meta property="og:site_name" content="위즐리 블로그">
-<meta property="og:title" content="HelloWorld!">
-<meta property="og:url" content="http://localhost:4000/test/HelloWorld/">
+<meta property="og:title" content="Posts by Tag">
+<meta property="og:url" content="http://localhost:4000/tags/">
 
 
   <meta property="og:description" content="HelloWorld! ">
@@ -31,8 +31,6 @@
 
 
 
-  <meta property="article:published_time" content="2020-02-19T00:00:00+09:00">
-
 
 
 
@@ -42,7 +40,7 @@
   
 
 
-<link rel="canonical" href="http://localhost:4000/test/HelloWorld/">
+<link rel="canonical" href="http://localhost:4000/tags/">
 
 
 
@@ -104,7 +102,7 @@
     
   </head>
 
-  <body class="layout--single">
+  <body class="layout--tags">
     <nav class="skip-links">
   <h2 class="screen-reader-text">Skip links</h2>
   <ul>
@@ -274,20 +272,65 @@
   </div>
 
 
-  <article class="page" itemscope itemtype="https://schema.org/CreativeWork">
-    <meta itemprop="headline" content="HelloWorld!">
-    <meta itemprop="description" content="HelloWorld!">
-    <meta itemprop="datePublished" content="2020-02-19T00:00:00+09:00">
+  <div class="archive">
+    
+      <h1 id="page-title" class="page__title">Posts by Tag</h1>
+    
     
 
-    <div class="page__inner-wrap">
+
+
+
+
+<ul class="taxonomy__index">
+  
+    
       
-        <header>
-          <h1 id="page-title" class="page__title" itemprop="headline">HelloWorld!
-</h1>
+        <li>
+          <a href="#init">
+            <strong>INIT</strong> <span class="taxonomy__count">1</span>
+          </a>
+        </li>
+      
+    
+      
+        <li>
+          <a href="#php">
+            <strong>PHP</strong> <span class="taxonomy__count">1</span>
+          </a>
+        </li>
+      
+    
+  
+</ul>
+
+
+  
+    
+      <section id="init" class="taxonomy__section">
+        <h2 class="archive__subtitle">INIT</h2>
+        <div class="entries-list">
           
-          <!--
-            <p class="page__meta"><i class="far fa-clock" aria-hidden="true"></i> 
+            
+
+
+
+<div class="list__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title" itemprop="headline">
+      
+        <a href="/test/HelloWorld/" rel="permalink">HelloWorld!
+</a>
+      
+    </h2>
+    <!--
+      comments:
+        아카이브 싱글 페이지 각 포스트 제목 하단에 Updated 시간 표기
+        기존에는 read_time이 표기됨
+    
+    
+      <p class="page__meta"><i class="far fa-clock" aria-hidden="true"></i> 
 
 
 
@@ -295,119 +338,33 @@
   최대 1 분 소요
 
 </p>
-          -->
-          <p class="page_data"><i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> 업데이트: <time datetime="2020-02-19T00:00:00+09:00">February 19, 2020</time></p>
-            
-        </header>
-      
-
-      <section class="page__content" itemprop="text">
-        
-          <aside class="sidebar__right ">
-            <nav class="toc">
-              <header><h4 class="nav__title"><i class="fas fa-file-alt"></i> On This Page</h4></header>
-              <ul class="toc__menu">
-  <li><a href="#helloworld">HelloWorld!</a></li>
-</ul>
-
-            </nav>
-          </aside>
-        
-        <h2 id="helloworld">HelloWorld!</h2>
-
-<p>HelloWorld!</p>
-
-        
-      </section>
-
-      <footer class="page__meta">
-        
-        
-  
-
-
-  
-  
-  
-
-  <p class="page__taxonomy">
-    <strong><i class="fas fa-fw fa-tags" aria-hidden="true"></i> 태그: </strong>
-    <span itemprop="keywords">
     
-      
-      
-      <a href="/tags/#init" class="page__taxonomy-item" rel="tag">INIT</a>
+    -->
     
-    </span>
-  </p>
-
-
-
-
-  
-
-
-  
-  
-  
-
-  <p class="page__taxonomy">
-    <strong><i class="fas fa-fw fa-folder-open" aria-hidden="true"></i> 카테고리: </strong>
-    <span itemprop="keywords">
+    <p class="page__meta"><i class="far fa-fw fa-calendar-alt" aria-hidden="true"></i> February 19 2020</p>
     
-      
-      
-      <a href="/categories/#test" class="page__taxonomy-item" rel="tag">TEST</a>
-    
-    </span>
-  </p>
 
-
-        
-          <p class="page__date"><strong><i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> 업데이트:</strong> <time datetime="2020-02-19T00:00:00+09:00">February 19, 2020</time></p>
-        
-      </footer>
-
-      <section class="page__share">
-  
-    <h4 class="page__share-title">공유하기</h4>
-  
-
-  <a href="https://twitter.com/intent/tweet?text=HelloWorld%21%20http%3A%2F%2Flocalhost%3A4000%2Ftest%2FHelloWorld%2F" class="btn btn--twitter" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="공유하기 Twitter"><i class="fab fa-fw fa-twitter" aria-hidden="true"></i><span> Twitter</span></a>
-
-  <a href="https://www.facebook.com/sharer/sharer.php?u=http%3A%2F%2Flocalhost%3A4000%2Ftest%2FHelloWorld%2F" class="btn btn--facebook" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="공유하기 Facebook"><i class="fab fa-fw fa-facebook" aria-hidden="true"></i><span> Facebook</span></a>
-
-  <a href="https://www.linkedin.com/shareArticle?mini=true&url=http%3A%2F%2Flocalhost%3A4000%2Ftest%2FHelloWorld%2F" class="btn btn--linkedin" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="공유하기 LinkedIn"><i class="fab fa-fw fa-linkedin" aria-hidden="true"></i><span> LinkedIn</span></a>
-</section>
-
-
-      
-  <nav class="pagination">
-    
-      <a href="#" class="pagination--pager disabled">이전</a>
-    
-    
-      <a href="/dev/PHP-+-nginx-+-mysql-@-docker%EB%A1%9C-%EA%B2%8C%EC%8B%9C%ED%8C%90-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0/" class="pagination--pager" title="PHP + nginx + mysql @ docker로 게시판 구현하기
-">다음</a>
-    
-  </nav>
-
-    </div>
-
-    
+    <p class="archive__item-excerpt" itemprop="description">HelloWorld!
+</p>
   </article>
+</div>
 
-  
-  
-    <div class="page__related">
-      <h4 class="page__related-title">참고</h4>
-      <div class="grid__wrapper">
-        
           
+        </div>
+        <a href="#page-title" class="back-to-top">맨 위로 이동 &uarr;</a>
+      </section>
+    
+  
+    
+      <section id="php" class="taxonomy__section">
+        <h2 class="archive__subtitle">PHP</h2>
+        <div class="entries-list">
+          
+            
 
 
 
-<div class="grid__item">
+<div class="list__item">
   <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
     
     <h2 class="archive__item-title" itemprop="headline">
@@ -441,13 +398,16 @@
   </article>
 </div>
 
-        
-      </div>
-    </div>
+          
+        </div>
+        <a href="#page-title" class="back-to-top">맨 위로 이동 &uarr;</a>
+      </section>
+    
   
-  
-</div>
 
+
+  </div>
+</div>
     </div>
 
     
