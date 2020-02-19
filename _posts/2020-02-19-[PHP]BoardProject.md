@@ -1,7 +1,7 @@
 ---
 published: true
 layout: single
-title : "[PHP]Board Project"
+title : "PHP + nginx + mysql @ docker로 게시판 구현하기"
 category : dev
 comments: false
 tag : PHP
