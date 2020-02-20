@@ -617,6 +617,83 @@ POST로 전송된 userID와 password가 db의 User Database의 Account 테이블
 
 [쿠키와 세션 개념](https://interconnection.tistory.com/74)
 
+쿠키를 통해 로그인 유지 상태에 변경을 주기 위해서는 아이디와 패스워드에 대한 검증이 끝난 직후에 발급을 하는 것이 가장 좋을 것이다. loginCheck.php를 다음과 같이 수정한다. 
+
+```php
+<?php
+	$conn = mysqli_connect("db", "wizley", "alpine");
+	if(!$conn){
+		die("Connection Error!!");
+	}
+	mysqli_select_db($conn, "User");
+	$query = "SELECT * FROM Account WHERE userID = '{$_POST['userID']}' AND password = '{$_POST['password']}'";
+	$result = mysqli_query($conn, $query);
+	$row = mysqli_fetch_array($result);
+
+	if(!$row){
+		echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
+		echo 'location.href="/loginForm.html";</script>';
+		exit;
+	}
+	setcookie("expireTime", $_POST['userID'], time()+3600);
+	echo '<script>location.href="/index.php"</script>';
+	
+	mysqli_close($conn);
+?>
+```
+
+이제 로그인에 성공하면 expireTime이라는 이름으로 userID 값을 가진 쿠키가 1시간동안 유지되게 된다. 이제 로그인을 한 후에 이동할 페이지를 만들어야 되는데 이름은 index.php로 지을 것이다.
+
+```php
+<?php
+	if(isset($_COOKIE['expireTime'])){
+		echo "로그인 정보 " . $_COOKIE['expireTime'];
+	}
+
+	else{
+		echo '<script>alert("로그인 페이지로 이동합니다.");';
+		echo 'location.href="/loginForm.html";</script>';
+	}
+?>
+```
+
+COOKIE에서 expireTime을 가져와 존재할 경우에는 그 값인 userID를 적어주고 아닌 경우에는 loginForm으로 이동시키는 간단한 로직이다.
+
+이제 로그아웃을 만들차례인데, 먼저 COOKIE를 확인하여 로그인한 상태인지를 본다. 그 후 로그아웃 버튼을 누르면 로그아웃이 진행되도록 할 것이다.
+
+```php
+<?php
+	if(isset($_COOKIE['expireTime'])){
+		echo '로그인 정보 ' . $_COOKIE['expireTime'] . '<br>';
+		echo '<a href="/logout.php">로그아웃</a>';
+	}
+
+	else{
+		echo '<script>alert("로그인 페이지로 이동합니다.");';
+		echo 'location.href="/loginForm.html";</script>';
+	}
+?>
+```
+
+다시 index.php에 버튼을 하나 추가해준다. 이제 이 버튼을 누르면 쿠키의 만료 기간을 현재의 시간보다 이전으로 변경함으로써 효력을 다하도록 만든다.
+
+```php
+<?php
+	setcookie("expireTime", "", time()-99999999);
+?>
+<script type="text/javascript">
+	location.href="/index.php";
+</script>
+```
+
+이제 로그아웃 버튼을 클릭하면 로그아웃이 진행된다!
+
+
+
+
+
+
+
 
 
 
