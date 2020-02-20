@@ -322,5 +322,4 @@ helloworld
 
 그 결과 localhost에 접속하면 영롱한 helloworld 문구를 확인할 수 있다.
 
-![helloworld](https://raw.githubsercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/helloworld.PNG)
-
+![helloworld](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/helloworld.PNG)
