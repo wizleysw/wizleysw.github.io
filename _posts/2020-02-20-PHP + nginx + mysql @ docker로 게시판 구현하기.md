@@ -563,5 +563,60 @@ image부분에 위의 IMAGE ID를 넣어주었고 container_name도 board_phpmys
 
 이제 원하는대로 DB의 쿼리작업이 가능하게 되었다. 
 
+### 로그인 구현
+
+쿼리의 조회가 가능하기 때문에 userID와 password를 사용하여 올바른 계정정보인지 검사하는 루틴에 대한 작성이 가능하다. 지금 이 단계에서는 loginForm이라는 HTML페이지를 생성한 뒤 loginCheck.php를 통해 조회하는 기능을 구현해볼 것이다.
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+	<title>로그인</title>
+	<meta charset="utf-8">
+</head>
+<body>
+	<form action="loginCheck.php" method="POST">
+		<input type="text" name="userID" placeholder="아이디"><br>
+		<input type="password" name="password" placeholder="패스워드"><br>
+		<button type="submit">로그인</button>
+	</form>
+</body>
+```
+
+위와 같이 간단하게 FORM을 생성하였고 userID와 password를 입력받은 뒤에 submit 버튼을 통해 loginCheck.php로 검사로직이 넘어가도록 구현을 하였다. 이제 loginCheck.php를 작성할 차례이다.
+
+```php
+<?php
+	$conn = mysqli_connect("db", "wizley", "alpine");
+	if(!$conn){
+		die("Connection Error!!");
+	}
+	mysqli_select_db($conn, "User");
+	$query = "SELECT * FROM Account WHERE userID = '{$_POST['userID']}' AND password = '{$_POST['password']}'";
+	$result = mysqli_query($conn, $query);
+	$row = mysqli_fetch_array($result);
+
+	if(!$row){
+		echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
+		echo 'location.href="/loginForm.html";</script>';
+		exit;
+	}
+
+	echo $row['userID'] . "님";
+	mysqli_close($conn);
+?>
+```
+
+POST로 전송된 userID와 password가 db의 User Database의 Account 테이블 내에서 올바른 값인지 조회된 뒤 결과에 따라 userID를 출력하거나 loginForm으로 리다이렉트를 한다. 
+
+![loginForm](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/loginForm.png)
+
+### 로그아웃 구현 
+
+로그인이 있으면 로그아웃 기능도 구현이 되어야 한다. 하지만 대부분의 유저들이 로그아웃을 진행하지 않기 때문에 Cookie를 생성하여 expire date를 구현하는게 좋아보인다. 이 시점에서 Session과 Cookie에 대한 개념을 아는 것이 중요한데 가장 큰 차이는 세션은 정보를 관리하는 대상이 서버인지 클라이언트인지가 다르다는 점이다. 
+
+[쿠키와 세션 개념](https://interconnection.tistory.com/74)
+
+
 
 
