@@ -688,11 +688,300 @@ COOKIE에서 expireTime을 가져와 존재할 경우에는 그 값인 userID를
 
 이제 로그아웃 버튼을 클릭하면 로그아웃이 진행된다!
 
+### 회원가입 구현
 
+로그인 부분이 대략적으로 구현되었으니 이제 회원가입 기능의 구현이 필요하다. 이를 위해서 loginForm 부분에 회원가입 링크를 추가해준다.
 
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>로그인</title>
+  <meta charset="utf-8">
+</head>
+<body>
+  <form action="loginCheck.php" method="POST">
+    <input type="text" name="userID" placeholder="아이디"><br>
+    <input type="password" name="password" placeholder="패스워드"><br>
+    <button type="submit">로그인</button>
+    <a href="signUp.html">회원가입</a>
+  </form>
+</body>
+```
 
+그리고 회원가입을 처리하기 위한 signUp.php를 생성한다. 여기서는 INSERT를 통해 계정정보를 USER database의 Account에 넣는 작업을 수행할 것이다. 
 
+```php
+<?php
+  $conn = mysqli_connect('db', 'wizley', 'alpine');
+  if(!$conn){
+    die("Connection Error!");
+  }
 
+  $dateNow = date("Y-m-d H:i:s");
+  mysqli_select_db($conn, "User");
+  $query = "
+    INSERT INTO Account(userID, password, nickname, created, status) 
+    VALUES('{$_POST['userID']}', '{$_POST['password']}', '{$_POST['nickname']}', '$dateNow', 1)
+  ";
+
+  $result = mysqli_query($conn, $query);
+  if(!$result){
+    echo '<script>alert("정보를 다시 확인해주시기 바랍니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+?>
+
+<script type="text/javascript">
+  alert("회원가입이 완료되었습니다.");
+  location.href="/loginForm.html";
+</script>
+```
+
+테스트를 수행하기 전에 TABLE의 정보를 보면 다음과 같다.
+
+```console
+mysql> select * from Account;
++----------+--------+----------+---------+--------+----------+
+| uniqueID | userID | password | created | status | nickname |
++----------+--------+----------+---------+--------+----------+
+|        1 | admin  | alpine   | NULL    |      1 | Admin    |
++----------+--------+----------+---------+--------+----------+
+1 row in set (0.00 sec)
+```
+
+이제 abcd / abcd / abcd로 아이디, 패스워드, 닉네임을 지정하고 회원가입을 진행하면 다음의 상태가 된다.
+
+```console
+mysql> select * from Account;
++----------+--------+----------+---------------------+--------+----------+
+| uniqueID | userID | password | created             | status | nickname |
++----------+--------+----------+---------------------+--------+----------+
+|        1 | admin  | alpine   | NULL                |      1 | Admin    |
+|        4 | abcd   | abcd     | 2020-02-20 10:14:44 |      1 | abcd     |
++----------+--------+----------+---------------------+--------+----------+
+2 rows in set (0.00 sec)
+```
+
+데이터 값은 잘 들어간 것을 확인할 수 있다. 여기서 uniqueID가 4인 이유는 2,3을 테스트에 사용하였기 때문이다. 이제 보안의 관점에서 봤을때 3가지 큰 로직 문제를 들 수 있다. 
+
+1. userId와 nickname의 중복검사가 수행여부
+2. password 필드의 평문 저장된 패스워드 정보
+3. 아무값도 입력하지 않아도 회원가입됨
+
+물론 여기서 xss라던가 sqli 취약점이 존재하겠지만 그 둘은 배제하고 로직적으로 구현이 필요한 부분은 위와 같이 요약할 수 있겠다. 그러면 중복검사 부분부터 추가하는 작업을 수행해보자. INSERT부분이 수행되기 전에 해당 userID랑 nickname을 조회하여 존재하는지에 대한 예외처리를 진행하면 된다.
+
+```php
+  mysqli_select_db($conn, "User");
+  $query = "SELECT * FROM Account WHERE userID = '{$_POST['userID']}'";
+  $result = mysqli_query($conn, $query);
+  if(mysqli_num_rows($result)>0){
+    echo '<script>alert("이미 존재하는 아이디입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  $query = "SELECT * FROM Account WHERE nickname = '{$_POST['nickname']}'";
+  $result = mysqli_query($conn, $query);
+  if(mysqli_num_rows($result)>0){
+    echo '<script>alert("다른 닉네임을 선택해주세요.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  $dateNow = date("Y-m-d H:i:s");
+  $query = "
+    INSERT INTO Account(userID, password, nickname, created, status) 
+    VALUES('{$_POST['userID']}', '{$_POST['password']}', '{$_POST['nickname']}', '$dateNow', 1)
+  ";
+
+  $result = mysqli_query($conn, $query);
+  if(!$result){
+    echo '<script>alert("정보를 다시 확인해주시기 바랍니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+```
+
+조회를 위해서 Account에서 userID와 nickname으로 쿼리를 조회해 한개라도 존재하면 history.back();을 하도록 세팅하였다. 이 과정에서 mysqli_num_rows($result)>0 을 mysqli_num_rows($result>0) 으로 잘못 작성하는 바람에 에러가 발생하지 않고 회원가입이 진행하였고 디비는 다음과 같이 더럽혀졌다. 
+
+```console
+mysql> select * from Account;
++----------+--------+----------+---------------------+--------+----------+
+| uniqueID | userID | password | created             | status | nickname |
++----------+--------+----------+---------------------+--------+----------+
+|        1 | admin  | alpine   | NULL                |      1 | Admin    |
+|        4 | abcd   | abcd     | 2020-02-20 10:14:44 |      1 | abcd     |
+|        5 | abcd   | 1        | 2020-02-20 10:21:29 |      1 | 1        |
+|        6 | admin  | 1        | 2020-02-20 10:22:17 |      1 | 1        |
+|        7 | abcd   | 1        | 2020-02-20 10:23:08 |      1 | 1        |
+|        8 | 11     | 1        | 2020-02-20 10:23:24 |      1 | 1        |
+|        9 | admin  | 1        | 2020-02-20 10:23:32 |      1 | 1        |
+|       10 | 123    | ????     | 2020-02-20 10:23:45 |      1 | 123      |
+|       11 | admin  | a        | 2020-02-20 10:24:28 |      1 |          |
+|       12 |        |          | 2020-02-20 10:28:35 |      1 |          |
++----------+--------+----------+---------------------+--------+----------+
+```
+
+쿼리에 대한 로깅을 하기 위해서 아래와 같이 설정을 변경하였다.
+
+```console
+mysql> SHOW VARIABLES LIKE '%general%';
++------------------+---------------------------------+
+| Variable_name    | Value                           |
++------------------+---------------------------------+
+| general_log      | OFF                             |
+| general_log_file | /var/lib/mysql/f68ab5883779.log |
++------------------+---------------------------------+
+2 rows in set (0.01 sec)
+
+mysql>
+mysql> SET GLOBAL general_log = ON;
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> SHOW VARIABLES LIKE '%general%';
++------------------+---------------------------------+
+| Variable_name    | Value                           |
++------------------+---------------------------------+
+| general_log      | ON                              |
+| general_log_file | /var/lib/mysql/f68ab5883779.log |
++------------------+---------------------------------+
+2 rows in set (0.01 sec)
+```
+
+그리고 해당 경로의 log파일을 확인해보면 다음과 같이 쿼리를 확인할 수 있다.
+
+```console
+root@f68ab5883779:/# cat /var/lib/mysql/f68ab5883779.log
+/usr/sbin/mysqld, Version: 8.0.19 (MySQL Community Server - GPL). started with:
+Tcp port: 3306  Unix socket: /var/run/mysqld/mysqld.sock
+Time                 Id Command    Argument
+2020-02-20T10:34:42.900555Z    29 Query SHOW VARIABLES LIKE '%general%'
+2020-02-20T10:35:40.703799Z    86 Connect wizley@board_phpmysqli.php_board_backend on  using TCP/IP
+2020-02-20T10:35:40.704496Z    86 Init DB User
+2020-02-20T10:35:40.705589Z    86 Query SELECT * FROM Account WHERE userID = 'admin'
+2020-02-20T10:35:40.706479Z    86 Query SELECT * FROM Account WHERE nickname = '123'
+2020-02-20T10:35:40.707205Z    86 Query INSERT INTO Account(userID, password, nickname, created, status)
+    VALUES('admin', '123', '123', '2020-02-20 10:35:40', 1)
+2020-02-20T10:35:40.709930Z    86 Quit
+```
+
+여기서 내가 넣은 쿼리가 제대로 작동을 했기에 멘붕이 왔지만 스트레스받으면서 소스코드를 계속 확인하다보니 발견할 수 있었다. 이제 저 부분을 통해서 중복에 대한 검사가 진행된다. 
+
+이제 두 번째로 고쳐야되는 부분은 password의 평문저장이다. DB를 설계할 때 hash화를 고려했기 때문에 해당 필드의 길이를 길게 두었었다. 
+
+[PHP : password_hash 함수로 암호화](https://m.blog.naver.com/psj9102/221223524085)
+
+위의 링크를 확인해보면 password_hash라는 함수가 php 내부에 구현되어 있는 것을 확인할 수 있다. 이제 해당 부분을 INSERT 문에 적용해주면 된다.
+
+```php
+  $dateNow = date("Y-m-d H:i:s");
+  $passwordHashed = password_hash($_POST['password'], PASSWORD_DEFAULT);
+  $query = "
+    INSERT INTO Account(userID, password, nickname, created, status) 
+    VALUES('{$_POST['userID']}', '$passwordHashed', '{$_POST['nickname']}', '$dateNow', 1)
+  ";
+```
+
+이제 이 값이 제대로 적용이 되서 login이 가능한지를 확인하기 위해서는 login쪽의 로직을 변경해야 된다.
+
+```php
+<?php
+  $conn = mysqli_connect("db", "wizley", "alpine");
+  if(!$conn){
+    die("Connection Error!!");
+  }
+  mysqli_select_db($conn, "User");
+  $query = "SELECT * FROM Account WHERE userID = '{$_POST['userID']}'";
+  $result = mysqli_query($conn, $query);
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
+    echo 'location.href="/loginForm.html";</script>';
+    exit;
+  }
+
+  if(password_verify($_POST['password'], $row['password'])){
+    setcookie("expireTime", $_POST['userID'], time()+3600);
+    echo '<script>location.href="/index.php"</script>';
+  }
+
+  else{
+    echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
+    echo 'location.href="/loginForm.html";</script>';
+    exit;
+  }
+
+  mysqli_close($conn);
+?>
+```
+
+loginCheck 부분을 다음과 같이 변경하였다. 그리고 abcd라는 아이디에 대해서 로그인을 시도하면 로그인에 성공하는 것을 확인 가능하다! 이제 이 과정에서 get_magic_quotes_gpc() 등을 통해 좀더 POST로 넘어오는 데이터에 대한 검증을 강화하도록 하겠다.
+
+[회원가입 폼 검증 후 출력](https://idkwim.tistory.com/154)
+
+위의 사이트의 유용한 부분을 가져와서 추가하였다.
+
+```php
+<?php
+  $conn = mysqli_connect("db", "wizley", "alpine");
+  if(!$conn){
+    die("Connection Error!!");
+  }
+
+  function fix_string($string){
+    if(get_magic_quotes_gpc()) $string=stripslashes($string);
+    return htmlentities($string);
+  }
+
+  $id=$pw="";
+
+  if(isset($_POST['userID']))
+    $id=fix_string($_POST['userID']);
+  if(isset($_POST['password']))
+    $pw=fix_string($_POST['password']);
+
+  if(strlen($id)<4){
+    echo '<script>alert("아이디를 잘못 입력하셨습니다.");';
+    echo 'location.href="/loginForm.html";</script>';
+    exit;
+  }
+
+  if(strlen($pw)<4){
+    echo '<script>alert("패스워드를 다시 입력해주세요.");';
+    echo 'location.href="/loginForm.html";</script>';
+    exit;
+  }
+
+  mysqli_select_db($conn, "User");
+  $query = "SELECT * FROM Account WHERE userID = '$id'";
+  $result = mysqli_query($conn, $query);
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
+    echo 'location.href="/loginForm.html";</script>';
+    exit;
+  }
+
+  if(password_verify($pw, $row['password'])){
+    setcookie("expireTime", $id, time()+3600);
+    echo '<script>location.href="/index.php"</script>';
+  }
+
+  else{
+    echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
+    echo 'location.href="/loginForm.html";</script>';
+    exit;
+  }
+
+  mysqli_close($conn);
+?>
+```
+
+조금 보완되긴 했지만 sqli를 막기 위해서는 prepared statement를 사용하는게 좋을 것 같다. 바꿔보도록 하자.
 
 
 

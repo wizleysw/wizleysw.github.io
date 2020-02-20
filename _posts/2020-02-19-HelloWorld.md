@@ -1,7 +1,7 @@
 ---
 title : "HelloWorld!"
 category : 
-    - TEST
+    - test
 tag : 
     - INIT
 author_profile : true
