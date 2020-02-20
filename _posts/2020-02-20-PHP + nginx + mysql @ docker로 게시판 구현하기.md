@@ -324,5 +324,244 @@ helloworld
 
 ![helloworld](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/helloworld.png)
 
+이제 database 설계를 진행할 것인데 가장 먼저 User 정보에 대한 부분의 설계를 해야된다.
+
+## User DB 구현 및 페이지 생성
+
+이제 DB를 설계해야되는데 게시판 기능을 크게 보았을 때 2개의 부류로 나눌 수 있다. 계정과 작성글이다. 
+
+### 계정정보 DB 설계 
+
+회원가입 기능을 통해 계정정보를 생성할 때 가장 중요한 것은 ID와 PASSWORD일 것이다. 그리고 부가적으로 효율적인 관리를 위해서 계정 생성일자 및 고유식별번호, 계정의 정지 활성화 여부판단에 사용될 상태정보, 닉네임 정도를 들 수 있겠다. 이를 정리해서 나타내면 다음과 같다.
+
+```
+- id
+- password
+- created
+- unique_id
+- status
+- nickname
+```
+
+이를 위해서 크게 User라는 데이터 베이스를 생성하고 account라는 table에 위의 정보를 추가하는 작업을 수행하도록 하겠다.
+
+```console
+Wizley:~/Project/PHP/php_board # docker ps -a
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                                         NAMES
+b734c92f7c80        nginx:1.17          "nginx -g 'daemon of…"   10 minutes ago      Up 10 minutes       0.0.0.0:80->80/tcp                            board_nginx
+f68ab5883779        mysql:8.0.19        "docker-entrypoint.s…"   10 minutes ago      Up 10 minutes       3306/tcp, 0.0.0.0:3300->3300/tcp, 33060/tcp   board_mysql
+205810f910ad        php:fpm             "docker-php-entrypoi…"   10 minutes ago      Up 10 minutes       9000/tcp                                      board_phpfpm
+
+Wizley:~/Project/PHP/php_board # docker exec -it board_mysql /bin/bash
+root@f68ab5883779:/# mysql -u wizley -p
+Enter password:
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 8
+Server version: 8.0.19 MySQL Community Server - GPL
+
+Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql>
+```
+
+exec 명령어를 통해 Container 내부로 접속하였다. 이제 database를 추가하면 된다.
+
+```console
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
++--------------------+
+1 row in set (0.01 sec)
+
+mysql> CREATE DATABASE User;
+ERROR 1044 (42000): Access denied for user 'wizley'@'%' to database 'User'
+```
+
+하지만 여기서 Access Denied를 통해 Wizley라는 계정의 권한으로 작업을 수행하지 못한다는 문구가 나온다. 이를 해결하기 위해서는 몇가지 명령어를 실행해야 한다.
+
+```console
+mysql> grant all privileges on * . * to 'wizley'@'%';
+Query OK, 0 rows affected (0.01 sec)
+```
+
+위의 명령어를 수행하고 나서 다시 wizley로 로그인을 하면 다음과 같이 databases가 추가로 보이는 것을 확인 가능하다.
+
+```console
+root@f68ab5883779:/# mysql -u wizley -p
+Enter password:
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+```
+
+이제 User라는 데이터베이스를 추가하는 작업이 가능하다. 
+
+```console
+mysql> CREATE DATABASE User;
+Query OK, 1 row affected (0.00 sec)
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| User               |
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+5 rows in set (0.00 sec)
+```
+
+User라는 데이터베이스를 추가하였고 목록에 추가된 것을 확인이 가능하다. 이제 조건에 맞게 account라는 Table을 생성할 것인데 이 경우에 NOT_NULL, PRIMARY KEY등의 설정이 필요하다. uniqueID의 경우 겹치는 값이 있으면 안되기 때문에 PRIMARY KEY가 설정되어 있어야 하며, ID또는 PASSWORD또한 없으면 안되는 정보이기에 NOT_NULL 조건이 붙어야 된다는 의미이다.
+
+```console
+mysql> use User;
+Database changed
+mysql> CREATE TABLE Account
+    -> (
+    -> uniqueID INT NOT NULL AUTO_INCREMENT,
+    -> userID CHAR(16) NOT NULL,
+    -> password CHAR(128) NOT NULL,
+    -> created DATETIME,
+    -> status INT NOT NULL,
+    -> nickname VARCHAR(10) NOT NULL,
+    -> PRIMARY KEY(uniqueID)
+    -> );
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> show tables;
++----------------+
+| Tables_in_User |
++----------------+
+| Account        |
++----------------+
+1 row in set (0.00 sec)
+```
+
+Account라는 테이블을 위의 설계와 같이 생성하였다. 이제 테스트를 위해 하나의 계정을 생성해보았다.
+
+```console
+mysql> INSERT INTO Account(userID, password, status, nickname) VALUES('admin', 'alpine', 1, 'Admin');
+Query OK, 1 row affected (0.00 sec)
+
+mysql> select * from Account;
++----------+--------+----------+---------+--------+----------+
+| uniqueID | userID | password | created | status | nickname |
++----------+--------+----------+---------+--------+----------+
+|        1 | admin  | alpine   | NULL    |      1 | Admin    |
++----------+--------+----------+---------+--------+----------+
+1 row in set (0.00 sec)
+```
+
+### DB 연결 확인 
+
+admin이라는 계정이 alpine이라는 패스워드로 생성된 것을 확인할 수 있다. 이제 제대로 DB가 backend 네트워크로 연결이 되었는지 확인을 하기 위해서 간단한 php 코드를 작성해볼 것이다.
+
+```php
+<?php
+	$conn = mysqli_connect('db', 'wizley', 'alpine');
+	if(!$conn){
+		die("Connection Error!");
+	}
+	echo "Success!";
+	mysqli_close($conn);
+?>
+```
+
+위와 같은 코드를 작성하고 구동을 해보았더니 Undefined mysqli_connect 에러가 발생하였다. php-mysqli가 설치되지 않아서 발생하는 문제였다. 해당 부분을 수정하기 위해 많은 삽질을 하였지만 기존의 Container에서는 고치지 못하였기에 다른 Image를 땡겨 쓰기로 마음먹었다.
+
+```console
+FROM php:fpm-alpine
+RUN docker-php-ext-install mysqli
+```
+
+위와 같이 Dockerfile을 생성하였고 build를 하였다.
+
+```console
+Wizley:~/Project/PHP/php_board # docker build --tag phpmysqli:1.0 .
+Sending build context to Docker daemon  198.9MB
+Step 1/2 : FROM php:fpm-alpine
+fpm-alpine: Pulling from library/php
+c9b1b535fdd9: Pull complete
+c1c0a1817bec: Pull complete
+cdd5b3ea1fc3: Pull complete
+db87396003bd: Pull complete
+6e71cca12e10: Pull complete
+ed2310d2f791: Pull complete
+601ef2217a14: Pull complete
+41dc18d982f5: Pull complete
+72be421f63f8: Pull complete
+f10dd871243f: Pull complete
+```
+
+그 후에 설치된 image 목록을 확인해보면 phpmysqli가 추가된 것을 확인할 수 있다.
+
+```console
+Wizley:~ # docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+phpmysqli           1.0                 b5cd17f37d99        6 minutes ago       83.9MB
+nginx               1.17                2073e0bcb60e        2 weeks ago         127MB
+php                 fpm                 c17c65c110d8        2 weeks ago         405MB
+php                 7.4                 7dc31b4f3403        2 weeks ago         405MB
+mysql               8.0.19              791b6e40940c        2 weeks ago         465MB
+php                 fpm-alpine          4a1ce12adee5        3 weeks ago         83.6MB
+```
+
+이제 docker-compose 파일에서도 약간의 수정이 필요하다.
+
+```yaml
+ php:
+  container_name: board_phpmysqli
+  image: b5cd17f37d99
+  networks:
+  - frontend
+  - backend
+  volumes:
+   - ./board:/board
+```
+
+image부분에 위의 IMAGE ID를 넣어주었고 container_name도 board_phpmysqli로 변경하였다. 그 후에 구동을 하면 Success! 문구가 뜨는 것을 확인 가능하다.
+
+이제 좀더 세부적인 데이터를 가져오도록 할 것이다. DB안에 맨 처음 추가한 admin을 조회하는 간단한 쿼리문을 짜볼 것이다.
+
+```php
+<?php
+	$conn = mysqli_connect("db", "wizley", "alpine");
+	if(!$conn){
+		die("Connection Error!");
+	}
+
+	mysqli_select_db($conn, "User");
+	$query = "SELECT * FROM Account";
+	$result = mysqli_query($conn, $query);
+	$row = mysqli_fetch_array($result);
+	echo "UserID   : " . $row['userID'] . "<br>";
+	echo "password : " . $row['password'] . "<br>";
+	mysqli_close($conn);
+?>
+```
+
+확인해보면 아래와 같이 admin / alpine이라는 정보를 가져온 것을 확인할 수 있다!
+
+![queryCheck](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/queryCheck.png)
+
+이제 원하는대로 DB의 쿼리작업이 가능하게 되었다. 
+
 
 
