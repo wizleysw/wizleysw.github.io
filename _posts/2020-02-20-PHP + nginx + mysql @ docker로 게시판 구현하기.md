@@ -983,6 +983,33 @@ loginCheck 부분을 다음과 같이 변경하였다. 그리고 abcd라는 아�
 
 조금 보완되긴 했지만 sqli를 막기 위해서는 prepared statement를 사용하는게 좋을 것 같다. 바꿔보도록 하자.
 
+```php
+$conn = new mysqli("db", "wizley", "alpine", "User");
+if(!$conn){
+  die("Connection Error!!");
+}
 
+$query = "SELECT* FROM Account WHERE userID LIKE ?";
+$stmt = $conn->stmt_init();
+$stmt = $conn->prepare($query);
+$stmt->bind_param("s", $id);
+$stmt->execute();
+$result = $stmt->get_result();
+$row = mysqli_fetch_array($result);
+```
+
+[prepared statement 예제](http://www.fun25.co.kr/blog/php-mysqli-simple-sample)
+
+위와 같이 약간의 변경을 하였고, prepare와 bind_param을 통해 파라미터의 데이터 타입등에 대한 설정을 하였다. 
+
+```console
+2020-02-20T13:41:37.437438Z   135 Prepare INSERT INTO Account(userID, password, nickname, created, status)
+    VALUES(?,?,?,'2020-02-20 13:41:37',1)
+2020-02-20T13:41:37.437713Z   135 Execute INSERT INTO Account(userID, password, nickname, created, status)
+    VALUES('test3','$2y$10$Z5KBtyAqTkrwZ.cp7GMW3OQlOdflgyHl8bTFwJ9VnD9.8zA3/fPBe','test3','2020-02-20 13:41:37',1)
+2020-02-20T13:41:37.439564Z   135 Close stmt
+```
+
+정상적으로 작동하는 것까지 확인이 된다. 
 
 
