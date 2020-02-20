@@ -981,6 +981,8 @@ loginCheck 부분을 다음과 같이 변경하였다. 그리고 abcd라는 아�
 ?>
 ```
 
+### prepared statement
+
 조금 보완되긴 했지만 sqli를 막기 위해서는 prepared statement를 사용하는게 좋을 것 같다. 바꿔보도록 하자.
 
 ```php
@@ -1011,5 +1013,54 @@ $row = mysqli_fetch_array($result);
 ```
 
 정상적으로 작동하는 것까지 확인이 된다. 
+
+### Session
+
+이제 세션을 추가할 차례이다. PHP에서는 session_start()를 통해 세션값을 생성한다고 한다. 마찬가지로 로그인이 되는 그 시점에 발급하는 것이 가장 좋아보인다. 해당 값은 기존의 COOKIE를 대체하여 로그인 여부를 확인하는 flag의 역할로 활용될 것이다.
+
+```php
+if(password_verify($pw, $row['password'])){
+  session_start();
+  $_SESSION['USERSESSION'] = $id;
+  setcookie("expireTime", $id, time()+3600);
+  echo '<script>location.href="/index.php"</script>';
+}
+```
+
+loginCheck.php 부분에서 SESSION을 추가해준다. 그리고 다른 php파일들에는 session_start()를 추가해주면 된다. 
+
+```php
+<?php
+  session_start();
+  if(isset($_SESSION['USERSESSION'])){
+  echo '로그인 정보 ' . $_SESSION['USERSESSION'] . '<br>';
+  echo '<a href="/logout.php">로그아웃</a>';
+  }
+
+  else{
+    echo '<script>alert("로그인 페이지로 이동합니다.");';
+    echo 'location.href="/loginForm.html";</script>';
+  }
+?>
+```
+
+이제 로그인 후에 SESSION에 대한 정보를 확인해보면 아래와 같이 생성된 것을 확인이 가능하다.
+
+![session](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/session.png)
+
+해당 값을 지우면 로그인이 되어 있지 않은 상태로 판단하여 loginForm.html을 띄우게 된다. logout 부분에서는 세션에 대한 정보를 제거해야하기 때문에 아래와 같이 session_destroy(); 를 추가해주면 된다.
+
+```php
+<?php
+  session_start();
+  setcookie("expireTime", "", time()-99999999);
+  session_destroy();
+?>
+```
+
+여기까지 회원가입과 로그인과 관련된 간단한 골격에 대한 설계가 마무리 되었다. 
+
+
+
 
 
