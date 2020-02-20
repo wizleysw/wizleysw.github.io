@@ -46,6 +46,8 @@ nginx는 동시접속을 효율적으로 처리하기 위해 개발이 된 웹 �
 
 그러면 이제 Docker를 설치해야 되는데 mysql, php, nginx를 각각 다른 Container로 받아오는 작업을 할 차례이다. latest 태그를 통해 최신 버전을 받을 수 있지만 개발 환경을 통일하기 위해 모든 컨테이너를 특정 버전을 명시하여 받을 것이다.
 
+### docker container
+
 도커에 대한 간단한 사용법은 아래의 링크를 통해 배우면 좋다.
 
 [초보를 위한 도커 안내서](https://subicura.com/2017/01/19/docker-guide-for-beginners-1.html)
@@ -112,6 +114,8 @@ mysql               8.0.19              791b6e40940c        2 weeks ago         
 ```
 
 (이 시점에서 알게 된 것은 PHP가 아닌 PHP-fpm을 사용하는 것이 좋다는 것이다. TechEmpower의 오래된 benchmark를 통해 php-fpm + php + nginx의 성능이 효율적이며 php-fpm을 통해 CGI의 처리 효율을 높일 수 있다고 한다.)
+
+### docker compose
 
 이 시점에서 고민을 하는 건 바로 네트워크를 물리는 작업이다. Docker 컨테이너를 frontend / backend 두 개의 네트워크로 분리한 뒤 각각 nginx+php-fpm / mysql+php-fpm 로 세팅을 하는 작업을 위해 compose를 작성할 필요가 있다.
 
@@ -318,5 +322,5 @@ helloworld
 
 그 결과 localhost에 접속하면 영롱한 helloworld 문구를 확인할 수 있다.
 
-[helloworld](https://raw.githubsercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/helloworld.PNG)
+![helloworld](https://raw.githubsercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/helloworld.PNG)
 
