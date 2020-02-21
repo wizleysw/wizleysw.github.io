@@ -1062,6 +1062,7 @@ drwxr-xr-x    1 root     root          4096 Feb 20 07:04 ..
 -rw-------    1 www-data www-data        23 Feb 21 10:44 sess_c99d3d8bbe51b9787f8896c84e851b73
 /tmp # cat sess_c99d3d8bbe51b9787f8896c84e851b73
 USERSESSION|s:4:"abcd";/tmp #
+
 ```
 
 해당 값을 지우면 로그인이 되어 있지 않은 상태로 판단하여 loginForm.php을 띄우게 된다. logout 부분에서는 세션에 대한 정보를 제거해야하기 때문에 아래와 같이 session_destroy(); 를 추가해주면 된다.
@@ -1222,7 +1223,7 @@ Query OK, 0 rows affected (0.02 sec)
 
 자 이제 DB에 대한 설계를 완료하였다. 이제 게시판 기능을 구현하면 된다.
 
-### 게시판 글 조회 구현
+### 게시판 글 목록 조회 구현
 
 가장 먼저 만들 페이지는 글 목록을 읽어와서 뿌려주는 페이지이다. 이를 위해서는 Board DB의 FreeBoard 테이블에 쿼리를 요청하여 response를 for문으로 받아와서 뿌려주어야 한다.
 
@@ -1325,4 +1326,132 @@ mysql> select * from FreeBoard;                                                 
 
 
 ![board](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/board.png)
+
+### 게시판 글 내용 조회 구현
+
+이제 게시판의 목록을 토대로 세부 내용을 조회하는 루틴의 구현이 필요하다. 여기서 고려해야될 사항은 다음과 같다.
+
+1. 게시판 번호에 대한 검증
+2. 게시판 권한 검증
+3. 게시판 비밀글 여부 확인
+
+1번같은 경우 no는 PRIMARY_KEY로 1부터 증가한다. 하지만 GET으로 넘어오는 파라미터의 값에 대한 검증이 없다면 no=0과 같이 존재하지 않는 게시물에 대한 조회요청이 들어올 것이다. 두 번째로는 게시판 권한 검증인데 로그인한 유저만 확인이 가능한 경우에는 SESSION 검증이 필요하다. 비밀글 같은 경우에는 당연히 패스워드를 입력받는 루틴이 추가되어야 한다.
+
+```php
+<?php
+  session_start();
+  $title = "글 보기";
+  require_once('head.php');
+  if(isset($_SESSION['USERSESSION'])){
+  echo '로그인 정보 ' . $_SESSION['NICKNAME'] . '<br>';
+  echo '<a href="/logout.php">로그아웃</a>';
+  }
+?>
+<meta charset="utf-8">
+
+<body>
+<div id="view_board">
+
+  <?php
+    function fix_string($string){
+      if(get_magic_quotes_gpc()) $string=stripslashes($string);
+      return htmlentities($string);
+    }
+
+    $no="";
+    if(isset($_GET['no']))
+      $no=fix_string($_GET['no']);
+
+    if($no<=0 or !$no){
+      echo '<script>alert("잘못된 접근입니다!");';
+      echo 'location.href="/board.php";</script>';
+      exit;
+    }
+
+    require_once('BoardDBConnect.php');
+    $query = "SELECT * FROM FreeBoard WHERE boardNo LIKE ?";
+    $stmt = $conn->stmt_init();
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("i", $no);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = mysqli_fetch_array($result);
+
+    if(!$row){
+      echo '<script>alert("잘못된 접근입니다!");';
+      echo 'history.back();</script>';
+      exit;
+    }
+
+    if($row['permission'] == 2){
+      if(!isset($_SESSION['USERSESSION'])){
+        echo '<script>alert("로그인이 필요합니다.");';
+        echo 'location.href="/loginForm.php";</script>';
+        exit;
+      }
+    }
+
+    else if($row['permission'] == 3){
+      echo '<script>alert("제한된 게시물입니다.");';
+      echo 'history.back();</script>';
+      exit;
+    }
+
+    if($row['secret'] == 1){
+      echo '<script>alert("비밀글입니다.");';
+      echo 'location.href="/secretBoard.php";</script>';
+      exit;
+    }
+
+    echo "<table>";
+    echo "<tr>";
+    echo "<th>번호</th>";
+    echo "<td>{$no}</td>";
+    echo "</tr>";
+    echo "<tr>";
+    echo "<th>제목</th>";
+    echo "<td>{$row['title']}</td>";
+    echo "</tr>";
+    echo "<tr>";
+    echo "<th>열람여부</th>";
+    if($row['secret']==1){
+      echo "<td>비밀글</td>";
+    }
+    else if($row['permission']==1){
+      echo "<td>전체공개</td>";
+    }
+    else{
+      echo "<td>회원전용</td>";
+    }
+    echo "</tr>";
+    echo "<tr>";
+    echo "<th>닉네임</th>";
+    echo "<td>{$row['author']}</td>";
+    echo "</tr>";
+    echo "<tr>";
+    echo "<th>작성일</th>";
+    echo "<td>{$row['time']}</td>";
+    echo "</tr>";
+    echo "<th>내용</th>";
+    echo "<td>{$row['content']}</td>";
+    echo "</table>";
+
+    $stmt->close();
+    $conn->close();
+  ?>
+</div>
+<button type="button" onclick="location.href='javascript:history.back();'">뒤로가</button>
+</body>
+</html>
+
+```
+
+파라미터는 view.php?no=1과 같은 형식으로 넘어오게 된다. 맨처음 no에 대한 검증을 진행하고 쿼리를 조회하여 권한에 대한 부분을 확인한다. 그 후 권한에 맞게 조건문을 탄 뒤, 조건 값에 맞는 경우 결과를 출력해준다. 결과를 확인해보면 다음과 같이 조회가 되는 것을 확인가능하다.
+
+
+![view](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/view.png)
+
+
+
+
 
