@@ -1224,6 +1224,8 @@ Query OK, 0 rows affected (0.02 sec)
 
 ### 게시판 글 조회 구현
 
+가장 먼저 만들 페이지는 글 목록을 읽어와서 뿌려주는 페이지이다. 이를 위해서는 Board DB의 FreeBoard 테이블에 쿼리를 요청하여 response를 for문으로 받아와서 뿌려주어야 한다.
+
 ```php
 <?php
   session_start();
@@ -1292,6 +1294,7 @@ prepared_statement를 활용하여 board.php를 생성하였다. 그 과정에�
 ?>
 ```
 
+이제 정상적으로 조회하여 값을 가져올 수 있는지를 확인할 차례이다.
 
 ```console
 mysql> INSERT INTO FreeBoard(title, author, time, content, secret, permission) VALUES('HelloWorld', 'Admin', '2020-02-20', 'ABCDEF', '0', '1');
@@ -1320,4 +1323,6 @@ mysql> select * from FreeBoard;                                                 
 
 테스트를 위해서 임의로 글 데이터 2개를 넣어주었다. 이제 board.php에 접속하여 확인을 해보면 다음과 같은 결과를 확인할 수 있다. 
 
+
 ![board](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/board.png)
+
