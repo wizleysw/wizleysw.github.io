@@ -766,7 +766,7 @@ mysql> select * from Account;
 
 데이터 값은 잘 들어간 것을 확인할 수 있다. 여기서 uniqueID가 4인 이유는 2,3을 테스트에 사용하였기 때문이다. 이제 보안의 관점에서 봤을때 3가지 큰 로직 문제를 들 수 있다. 
 
-1. userId와 nickname의 중복검사가 수행여부
+1. userId와 nickname의 중복검사 수행여부
 2. password 필드의 평문 저장된 패스워드 정보
 3. 아무값도 입력하지 않아도 회원가입됨
 
@@ -1048,6 +1048,22 @@ loginCheck.php 부분에서 SESSION을 추가해준다. 그리고 다른 php파�
 
 ![session](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/session.png)
 
+그리고 서버쪽의 /tmp 폴더의 내부에 세션파일이 저장된다.
+
+```console
+/tmp # ls -al
+total 16
+drwxrwxrwt    1 root     root          4096 Feb 21 10:32 .
+drwxr-xr-x    1 root     root          4096 Feb 20 07:04 ..
+-rw-------    1 www-data www-data         0 Feb 20 13:54 sess_0f3199d2a07722100a88c9a6f94408b9
+-rw-------    1 www-data www-data         0 Feb 20 13:55 sess_46065d93eaa6a2970aa186fd18ef4654
+-rw-------    1 www-data www-data        23 Feb 20 13:58 sess_6595d62b49e2689cb2554439fca4e43a
+-rw-------    1 www-data www-data         0 Feb 20 13:54 sess_79e56a43f802556787697272a23f3dbf
+-rw-------    1 www-data www-data        23 Feb 21 10:44 sess_c99d3d8bbe51b9787f8896c84e851b73
+/tmp # cat sess_c99d3d8bbe51b9787f8896c84e851b73
+USERSESSION|s:4:"abcd";/tmp #
+```
+
 해당 값을 지우면 로그인이 되어 있지 않은 상태로 판단하여 loginForm.html을 띄우게 된다. logout 부분에서는 세션에 대한 정보를 제거해야하기 때문에 아래와 같이 session_destroy(); 를 추가해주면 된다.
 
 ```php
@@ -1060,7 +1076,89 @@ loginCheck.php 부분에서 SESSION을 추가해준다. 그리고 다른 php파�
 
 여기까지 회원가입과 로그인과 관련된 간단한 골격에 대한 설계가 마무리 되었다. 
 
+### 소스코드 모듈화
 
+새로운 DB를 설계하기 전에 약간의 코드 리팩토링을 진행하도록 할건데 겹치는 기능을 수행하는 코드를 하나의 독립된 php파일로 분리하는 작업이다.
+
+```php
+<!DOCTYPE html>
+<html>
+<head>
+  <title><?php echo $title; ?></title>
+</head>
+```
+
+HTML파일의 윗 부분은 매번 같은 구조로 설계를 진행하고 있으니 그 타이틀의 값만 변경하면 된다. 그리고 이에 맞춰서 loginForm.html을 다음과 같이 변경하면 된다.
+
+```HTML
+<?php
+  $title = "로그인";
+  require_once('head.php');
+?>
+<meta charset="utf-8">
+<body>
+  <form action="loginCheck.php" method="POST">
+    <input type="text" name="userID" placeholder="아이디" required><br>
+    <input type="password" name="password" placeholder="패스워드" required><br>
+    <button type="submit">로그인</button>
+    <a href="signUp.html">회원가입</a>
+  </form>
+</body>
+```
+
+DB부분도 mysqli를 요청하는 부분은 동일하기 때문에 분리를 진행한다.
+
+```php
+<?php
+  $conn = new mysqli("db", "wizley", "alpine", "User");
+  if(!$conn){
+    die("Connection Error!");
+  }
+?>
+```
+
+UserDBconnect.php라는 독립된 파일로 분리함으로써 db명 또는 Database의 이름을 한 파일에서만 변경해주면 같은 DB를 사용하고 있는 여러 php에 대한 값을 한 번에 변경가능하다. 이 시점에서 또 드는 고민이 게시판 기능의 작성자명으로 nickname을 사용하는 것이 낫다는 것이다. 그리고 그 값은 session에 저장되면 좋을 것 같아서 로직 수정을 하도록 하겠다.
+
+```php
+  $query = "SELECT* FROM Account WHERE userID LIKE ?";
+  $stmt = $conn->stmt_init();
+  $stmt = $conn->prepare($query);
+  $stmt->bind_param("s", $id);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
+    echo 'location.href="/loginForm.html";</script>';
+    exit;
+  }
+
+  if(password_verify($pw, $row['password'])){
+    session_start();
+    $_SESSION['USERSESSION'] = $id;
+    $_SESSION['NICKNAME'] = $row['nickname'];
+    setcookie("expireTime", $id, time()+3600);
+    echo '<script>location.href="/index.php"</script>';
+  }
+```
+
+다행히 기존의 result값을 row에 저장해놓았기에 해당 값을 기준으로 NICKNAME이라는 값을 하나 더 저장해놓으면 됬다. 그리고 다시 서버의 세션상태를 보면 다음과 같이 닉네임이 저장되어 있는 것을 확인 가능하다.
+
+```console
+/tmp # ls -al
+total 16
+drwxrwxrwt    1 root     root          4096 Feb 21 10:48 .
+drwxr-xr-x    1 root     root          4096 Feb 20 07:04 ..
+-rw-------    1 www-data www-data         0 Feb 20 13:54 sess_0f3199d2a07722100a88c9a6f94408b9
+-rw-------    1 www-data www-data         0 Feb 20 13:55 sess_46065d93eaa6a2970aa186fd18ef4654
+-rw-------    1 www-data www-data        23 Feb 20 13:58 sess_6595d62b49e2689cb2554439fca4e43a
+-rw-------    1 www-data www-data         0 Feb 20 13:54 sess_79e56a43f802556787697272a23f3dbf
+-rw-------    1 www-data www-data        42 Feb 21 10:48 sess_c99d3d8bbe51b9787f8896c84e851b73
+/tmp # cat sess_c99d3d8bbe51b9787f8896c84e851b73
+```
+
+ 
 
 
 
