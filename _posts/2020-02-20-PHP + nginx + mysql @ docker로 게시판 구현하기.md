@@ -293,7 +293,7 @@ Wizley:~/Project/PHP/Board # docker inspect board_backend
 ```console
 Wizley:~/Project/PHP/Board # cat site.conf
 server {
-    index index.html;
+    index index.php;
     server_name wizley.com;
     error_log  /var/log/nginx/error.log;
     access_log /var/log/nginx/access.log;
@@ -326,7 +326,7 @@ helloworld
 
 이제 database 설계를 진행할 것인데 가장 먼저 User 정보에 대한 부분의 설계를 해야된다.
 
-## User DB 구현 및 페이지 생성
+## User DB 구현 및 계정 관련 기능 구현
 
 이제 DB를 설계해야되는데 게시판 기능을 크게 보았을 때 2개의 부류로 나눌 수 있다. 계정과 작성글이다. 
 
@@ -598,7 +598,7 @@ image부분에 위의 IMAGE ID를 넣어주었고 container_name도 board_phpmys
 
 	if(!$row){
 		echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
-		echo 'location.href="/loginForm.html";</script>';
+		echo 'location.href="/loginForm.php";</script>';
 		exit;
 	}
 
@@ -632,7 +632,7 @@ POST로 전송된 userID와 password가 db의 User Database의 Account 테이블
 
 	if(!$row){
 		echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
-		echo 'location.href="/loginForm.html";</script>';
+		echo 'location.href="/loginForm.php";</script>';
 		exit;
 	}
 	setcookie("expireTime", $_POST['userID'], time()+3600);
@@ -652,7 +652,7 @@ POST로 전송된 userID와 password가 db의 User Database의 Account 테이블
 
 	else{
 		echo '<script>alert("로그인 페이지로 이동합니다.");';
-		echo 'location.href="/loginForm.html";</script>';
+		echo 'location.href="/loginForm.php";</script>';
 	}
 ?>
 ```
@@ -670,7 +670,7 @@ COOKIE에서 expireTime을 가져와 존재할 경우에는 그 값인 userID를
 
 	else{
 		echo '<script>alert("로그인 페이지로 이동합니다.");';
-		echo 'location.href="/loginForm.html";</script>';
+		echo 'location.href="/loginForm.php";</script>';
 	}
 ?>
 ```
@@ -704,7 +704,7 @@ COOKIE에서 expireTime을 가져와 존재할 경우에는 그 값인 userID를
     <input type="text" name="userID" placeholder="아이디"><br>
     <input type="password" name="password" placeholder="패스워드"><br>
     <button type="submit">로그인</button>
-    <a href="signUp.html">회원가입</a>
+    <a href="signUp.php">회원가입</a>
   </form>
 </body>
 ```
@@ -735,7 +735,7 @@ COOKIE에서 expireTime을 가져와 존재할 경우에는 그 값인 userID를
 
 <script type="text/javascript">
   alert("회원가입이 완료되었습니다.");
-  location.href="/loginForm.html";
+  location.href="/loginForm.php";
 </script>
 ```
 
@@ -899,7 +899,7 @@ Time                 Id Command    Argument
 
   if(!$row){
     echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
-    echo 'location.href="/loginForm.html";</script>';
+    echo 'location.href="/loginForm.php";</script>';
     exit;
   }
 
@@ -910,7 +910,7 @@ Time                 Id Command    Argument
 
   else{
     echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
-    echo 'location.href="/loginForm.html";</script>';
+    echo 'location.href="/loginForm.php";</script>';
     exit;
   }
 
@@ -945,13 +945,13 @@ loginCheck 부분을 다음과 같이 변경하였다. 그리고 abcd라는 아�
 
   if(strlen($id)<4){
     echo '<script>alert("아이디를 잘못 입력하셨습니다.");';
-    echo 'location.href="/loginForm.html";</script>';
+    echo 'location.href="/loginForm.php";</script>';
     exit;
   }
 
   if(strlen($pw)<4){
     echo '<script>alert("패스워드를 다시 입력해주세요.");';
-    echo 'location.href="/loginForm.html";</script>';
+    echo 'location.href="/loginForm.php";</script>';
     exit;
   }
 
@@ -962,7 +962,7 @@ loginCheck 부분을 다음과 같이 변경하였다. 그리고 abcd라는 아�
 
   if(!$row){
     echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
-    echo 'location.href="/loginForm.html";</script>';
+    echo 'location.href="/loginForm.php";</script>';
     exit;
   }
 
@@ -973,7 +973,7 @@ loginCheck 부분을 다음과 같이 변경하였다. 그리고 abcd라는 아�
 
   else{
     echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
-    echo 'location.href="/loginForm.html";</script>';
+    echo 'location.href="/loginForm.php";</script>';
     exit;
   }
 
@@ -1039,7 +1039,7 @@ loginCheck.php 부분에서 SESSION을 추가해준다. 그리고 다른 php파�
 
   else{
     echo '<script>alert("로그인 페이지로 이동합니다.");';
-    echo 'location.href="/loginForm.html";</script>';
+    echo 'location.href="/loginForm.php";</script>';
   }
 ?>
 ```
@@ -1064,7 +1064,7 @@ drwxr-xr-x    1 root     root          4096 Feb 20 07:04 ..
 USERSESSION|s:4:"abcd";/tmp #
 ```
 
-해당 값을 지우면 로그인이 되어 있지 않은 상태로 판단하여 loginForm.html을 띄우게 된다. logout 부분에서는 세션에 대한 정보를 제거해야하기 때문에 아래와 같이 session_destroy(); 를 추가해주면 된다.
+해당 값을 지우면 로그인이 되어 있지 않은 상태로 판단하여 loginForm.php을 띄우게 된다. logout 부분에서는 세션에 대한 정보를 제거해야하기 때문에 아래와 같이 session_destroy(); 를 추가해주면 된다.
 
 ```php
 <?php
@@ -1088,9 +1088,9 @@ USERSESSION|s:4:"abcd";/tmp #
 </head>
 ```
 
-HTML파일의 윗 부분은 매번 같은 구조로 설계를 진행하고 있으니 그 타이틀의 값만 변경하면 된다. 그리고 이에 맞춰서 loginForm.html을 다음과 같이 변경하면 된다.
+HTML파일의 윗 부분은 매번 같은 구조로 설계를 진행하고 있으니 그 타이틀의 값만 변경하면 된다. 그리고 이에 맞춰서 loginForm.php를 다음과 같이 변경하면 된다.
 
-```HTML
+```html
 <?php
   $title = "로그인";
   require_once('head.php');
@@ -1101,7 +1101,7 @@ HTML파일의 윗 부분은 매번 같은 구조로 설계를 진행하고 있�
     <input type="text" name="userID" placeholder="아이디" required><br>
     <input type="password" name="password" placeholder="패스워드" required><br>
     <button type="submit">로그인</button>
-    <a href="signUp.html">회원가입</a>
+    <a href="signUp.php">회원가입</a>
   </form>
 </body>
 ```
@@ -1130,7 +1130,7 @@ UserDBconnect.php라는 독립된 파일로 분리함으로써 db명 또는 Data
 
   if(!$row){
     echo '<script>alert("아이디 또는 패스워드가 올바르지 않습니다.");';
-    echo 'location.href="/loginForm.html";</script>';
+    echo 'location.href="/loginForm.php";</script>';
     exit;
   }
 
@@ -1158,7 +1158,166 @@ drwxr-xr-x    1 root     root          4096 Feb 20 07:04 ..
 /tmp # cat sess_c99d3d8bbe51b9787f8896c84e851b73
 ```
 
- 
+## Board DB 구현 및 게시판 기능 구현
+
+이제 게시판 부분의 구현을 진행할 차례이다. User와 마찬가지로 새로운 DB를 생성하여 Board라는 이름을 지어줄 것이다. 그리고 Table 명으로 FreeBoard를 주어서 간단한 자유게시판의 기능을 구현하는데 까지 진행한 뒤에 이 프로젝트를 마무리할 예정이다. 물론 실제 게시판 배포에서는 좋아요/싫어요, 댓글 기능 등 추가적인 구현이 필요하겠지만 PHP는 이런식으로 돌아가는구나를 아는 정도로 마칠 프로젝트라 Django를 구현하는 과정에서 고민을 해보도록 하겠다..
 
 
+### 게시판 DB 설계
 
+게시판의 주요 컨텐츠는 다음과 같이 요약할 수 있다.
+
+1.글 번호 
+2.글 제목
+3.글 작성자
+4.글 작성시간
+5.글 내용
+6.비밀글 여부 
+7.비밀글 패스워드
+8.전체/로그인 글 여부
+9.조회수 
+
+여기서 글 번호는 고유 번호로 PRIMARY KEY를 사용하여 구현하면 될 것 같고 작성자는 세션을 통해 얻어오는 것이 가능하다. 전체/로그인의 경우 게시판 글이 권한을 구분해주는 것인데 1일 경우 로그인을 하지 않은 계정으로도 열람이 가능하도록 하며, 그 외에는 로그인을 해야지만 글의 컨텐츠를 확인할 수 있도록 할 것이다. 또한 만약의 경우를 생각해서 2의 값으로는 게시판을 블락하는 용도로도 발전할 수 있을 것 같다. 비밀글은 글에 패스워드를 걸어서 특정 사용자만 볼 수 있도록 하는 것이다. 
+
+이제 DB를 설계해보자.
+
+```console
+mysql> CREATE DATABASE Board;
+Query OK, 1 row affected (0.01 sec)
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| Board              |
+| User               |
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+6 rows in set (0.00 sec)
+```
+
+정상적으로 Board라는 database를 생성하였다. 이제 해당 DB아래에 FreeBoard 테이블을 생성할 것이다. 
+
+```console
+mysql> use Board;
+Database changed
+mysql> CREATE TABLE FreeBoard
+    -> (
+    -> boardNo int NOT NULL AUTO_INCREMENT,
+    -> title VARCHAR(16) NOT NULL,
+    -> author VARCHAR(16) NOT NULL,
+    -> time datetime NOT NULL,
+    -> content text NOT NULL,
+    -> secret int,
+    -> secretPassword VARCHAR(128),
+    -> permission int NOT NULL,
+    -> PRIMARY KEY(boardNo)
+    -> )
+    -> ;
+Query OK, 0 rows affected (0.02 sec)
+```
+
+자 이제 DB에 대한 설계를 완료하였다. 이제 게시판 기능을 구현하면 된다.
+
+### 게시판 글 조회 구현
+
+```php
+<?php
+  session_start();
+  $title = "자유게시판";
+  require_once('head.php');
+  if(isset($_SESSION['USERSESSION'])){
+  echo '로그인 정보 ' . $_SESSION['NICKNAME'] . '<br>';
+  echo '<a href="/logout.php">로그아웃</a>';
+  }
+?>
+<meta charset="utf-8">
+
+<body>
+<div id="board">
+  <table>
+    <tr>
+      <th>번호</th>
+      <th>제목</th>
+      <th>열람여부</th>
+      <th>닉네임</th>
+      <th>작성일</th>
+    </tr>
+
+    <?php
+      require_once('BoardDBConnect.php');
+      $count = 0;
+      $query = "SELECT* FROM FreeBoard";
+      $stmt = $conn->stmt_init();
+      $stmt = $conn->prepare($query);
+      $stmt->execute();
+      $result = $stmt->get_result();
+      while($row = mysqli_fetch_array($result)){
+        $count += 1;
+        echo "<tr>";
+        echo "<td>{$count}</td>";
+        echo "<td>{$row['title']}</td>";
+        if($row['secret']==1){
+          echo "<td>비밀글</td>";
+        }
+        else if($row['permission']==1){
+          echo "<td>전체공개</td>";
+        }
+        else{
+          echo "<td>회원전용</td>";
+        }
+        echo "<td>{$row['author']}</td>";
+        echo "<td>{$row['time']}</td>";
+      }
+      $stmt->close();
+      $conn->close();
+    ?>
+  </table>
+</div>
+</body>
+</html>
+```
+
+prepared_statement를 활용하여 board.php를 생성하였다. 그 과정에서 DB에 대한 모듈화 코드 또한 추가하였다. 
+
+```php
+<?php
+  $conn = new mysqli("db", "wizley", "alpine", "Board");
+  if(!$conn){
+    die("Connection Error!");
+  }
+?>
+```
+
+
+```console
+mysql> INSERT INTO FreeBoard(title, author, time, content, secret, permission) VALUES('HelloWorld', 'Admin', '2020-02-20', 'ABCDEF', '0', '1');
+Query OK, 1 row affected (0.00 sec)
+
+mysql> select * from FreeBoard;
++---------+------------+--------+---------------------+---------+--------+----------------+------------+
+| boardNo | title      | author | time                | content | secret | secretPassword | permission |
++---------+------------+--------+---------------------+---------+--------+----------------+------------+
+|       1 | HelloWorld | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          1 |
++---------+------------+--------+---------------------+---------+--------+----------------+------------+
+1 row in set (0.00 sec)
+
+mysql> INSERT INTO FreeBoard(title, author, time, content, secret, permission) VALUES('HelloWorld2', 'Admin', '2020-02-20', 'ABCDEF', '0', '1');
+Query OK, 1 row affected (0.00 sec)
+
+mysql> select * from FreeBoard;                                                                                                     +---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+| boardNo | title       | author | time                | content | secret | secretPassword | permission |
++---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+|       1 | HelloWorld  | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          1 |
+|       2 | HelloWorld2 | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          1 |
++---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+2 rows in set (0.00 sec)
+
+```
+
+테스트를 위해서 임의로 글 데이터 2개를 넣어주었다. 이제 board.php에 접속하여 확인을 해보면 다음과 같은 결과를 확인할 수 있다. 
+
+![board](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/board.png)
