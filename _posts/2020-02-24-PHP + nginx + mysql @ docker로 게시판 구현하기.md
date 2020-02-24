@@ -1960,5 +1960,179 @@ secretPassword의 값은 사용자의 패스워드를 해쉬한 값을 사용하
 view.php에서 해당 부분의 변수의 위치를 변경하자 정상적으로 작동하는 것을 확인할 수 있었다. 마이너한 로직 버그를 곳곳에 수정을 해주고 나면 작성하는 기능도 완료된다!
 
 
+### 게시판 글 삭제 구현
+
+드디어 대망의 삭제 부분까지 도달하였다. 이 부분을 끝으로 생각했던 게시판의 간단한 기능들에 대한 구현은 마무리 될 것 같다. 해당 기능도 마찬가지로 조회를 들어간 상태에서 수정옆에 존재하면 좋을 기능이기에 끼워넣는 방식으로 구현하도록 하겠다.
+
+```php
+<button type="button" onclick="location.href='javascript:history.back();'">뒤로가기</button>
+<button type="button" onclick="location.href='/modifyPage.php?no=<?php echo $no?>'">수정하기</button>
+<button type="button" onclick="location.href='/deletePage.php?no=<?php echo $no?>'">삭제하기</button>
+```
+
+view 부분에 버튼을 추가해준다.
+
+```php
+<?php
+  session_start();
+  $title = "글 삭";
+  require_once('head.php');
+  
+  if(!isset($_SESSION['USERSESSION'])){
+    echo '<script>alert("로그인이 필요합니다.");';
+    echo 'location.href="/loginForm.php";</script>';
+    exit;
+  }
+
+  function fix_string($string){
+    if(get_magic_quotes_gpc()) $string=stripslashes($string);
+    return htmlentities($string);
+  }
+  
+  $no="";
+  if(isset($_REQUEST['no'])){
+    $no=fix_string($_REQUEST['no']);
+  }
+
+  if($no<=0 or !$no){
+    echo '<script>alert("잘못된 접근입니다!");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  require_once('BoardDBConnect.php');
+  $query = "SELECT * FROM FreeBoard WHERE boardNo LIKE ?";
+  $stmt = $conn->stmt_init();
+  $stmt = $conn->prepare($query);
+  $stmt->bind_param("i", $no);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("잘못된 접근입니다!");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!($row['author'] == $_SESSION['NICKNAME'])){
+    echo '<script>alert("글 작성자만 삭제 가능합니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+?>
+
+<form action="/delete.php" method="POST">
+한번 삭제된 글은 복구가 되지 않습니다. 그래도 삭제하시겠습니까?<br>
+<input type="hidden" id="no" name="no" value="<?php echo $no?>">
+<input type="password" name="password" placeholder="패스워드" required><br>
+<button type="submit">글 삭제</button>
+<button type="button" onclick="location.href='/board.php'">취소</button>
+</form>
+
+```
+
+먼저 겁을 주는 페이지를 작성한다. 그리고 낭낭히 패스워드도 입력을 받는다.
+
+
+```php
+<?php
+  session_start();
+  $title = "글 삭제";
+  require_once('head.php');
+
+  function fix_string($string){
+    if(get_magic_quotes_gpc()) $string=stripslashes($string);
+    return htmlentities($string);
+  }
+
+  $id=$_SESSION['USERSESSION'];
+  $no=$pw;
+  if(isset($_REQUEST['password']))
+    $pw=fix_string($_REQUEST['password']);
+
+  if(isset($_REQUEST['no'])){
+    $no=fix_string($_REQUEST['no']);
+  }
+
+  if($no<=0 or !$no){
+    echo '<script>alert("잘못된 접근입니다!");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(strlen($pw)<4){
+    echo '<script>alert("패스워드를 다시 입력해주세요.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  require_once('UserDBconnect.php');
+  $query = "SELECT * FROM Account WHERE userID LIKE ?";
+  $stmt = $conn->stmt_init();
+  $stmt = $conn->prepare($query);
+  $stmt->bind_param("s", $id);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("잘못된 정보입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!($row['userID']==$id)){
+    echo '<script>alert("잘못된 정보입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!password_verify($pw, $row['password'])){
+    echo '<script>alert("패스워드가 잘못되었습니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  $conn2 = new mysqli("db", "wizley", "alpine", "Board");
+  if(!$conn2){
+    die("Connection Error!");
+  }
+  $query = "SELECT * FROM FreeBoard WHERE boardNo LIKE ?";
+  $stmt = $conn2->stmt_init();
+  $stmt = $conn2->prepare($query);
+  $stmt->bind_param("i", $no);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+  echo '<script>alert("잘못된 접근입니다!");';
+  echo 'history.back();</script>';
+  exit;
+  }
+
+  if(!($row['author'] == $_SESSION['NICKNAME'])){
+    echo '<script>history.back();</script>';
+    exit;
+  }
+
+  $query = "DELETE FROM FreeBoard WHERE boardNo=?";
+  $stmt = $conn2->stmt_init();
+  $stmt = $conn2->prepare($query);
+  $stmt->bind_param("i", $no);
+  $stmt->execute();
+
+  $stmt->close();
+  $conn->close();
+  $conn2->close();
+
+  echo '<script>alert("삭제 완료되었습니다.");';
+  echo 'location.href="/board.php";</script>';
+?>
+```
+
+남은건 위와 같이 검증과정을 걸친 뒤 DELETE를 사용해서 boardNo로 삭제를 진행하면 된다. 테스트를 통해 정상적으로 글이 삭제되는 것을 확인할 수 있었다. 
 
 
