@@ -2135,4 +2135,43 @@ view 부분에 버튼을 추가해준다.
 
 남은건 위와 같이 검증과정을 걸친 뒤 DELETE를 사용해서 boardNo로 삭제를 진행하면 된다. 테스트를 통해 정상적으로 글이 삭제되는 것을 확인할 수 있었다. 
 
+### 키워드 검색 기능 구현
+
+다 끝난것 같았는데 먼가 허전한 기분이어서 생각을 해보니 게시판에 대해서 특정 게시물을 검색하는 기능에 대한 구현이 없었다. 이것까지 구현하면 진짜 간단한 기능을 수행하는 게시판이라고 불릴만한다고 생각을 한다.
+
+```php
+<form method="GET" action="/board.php">
+<input type="text" name="keyword">
+<button type="submit">검색</button>
+</form>
+```
+
+board.php에 다음과 같은 form을 생성하였다. 이제 form의 결과를 토대로 게시물을 검색하도록 쿼리문을 수정하면 된다.
+
+```php
+      $keyword="";
+      if(isset($_GET['keyword'])){
+        $keyword=fix_string($_GET['keyword']);
+        $keyword='%'.$keyword.'%';
+        $query = "SELECT * FROM FreeBoard WHERE title LIKE ?";
+        $stmt = $conn->stmt_init();
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("s", $keyword);
+        $stmt->execute();
+        $result = $stmt->get_result();
+      }
+      else{
+        $query = "SELECT * FROM FreeBoard";
+        $stmt = $conn->stmt_init();
+        $stmt = $conn->prepare($query);
+        $stmt->execute();
+        $result = $stmt->get_result();
+      }
+```
+
+윗 부분에서 keyword가 존재하면 LIKE문을 통해 해당 keyword가 존재하는 값들을 출력하도록 한다. 
+
+![keyword](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/keyword.png)
+
+hello라는 검색에 대하여 쿼리 조회를 통해 게시물들을 출력하는 것을 확인할 수 있다!. 이제 기본적인 게시판 관련 구현은 마무리가 되었다. 혹시나 더 진도를 나가고 싶은 분들은 게시물의 개수에 따른 페이지 구현 및 댓글 기능등을 추가로 구현해보는 것도 좋을 것 같다. 
 
