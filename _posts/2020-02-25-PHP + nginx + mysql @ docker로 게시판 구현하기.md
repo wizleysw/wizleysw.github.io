@@ -1603,7 +1603,7 @@ view.php에서 modifyPage.php로의 링크를 추가해준다.
 ```php
 <?php
   session_start();
-  $title = "글 수";
+  $title = "글 수정";
   require_once('head.php');
   if(isset($_SESSION['USERSESSION'])){
   echo '로그인 정보 ' . $_SESSION['NICKNAME'] . '<br>';
@@ -1705,7 +1705,7 @@ UPDATE 명령어로 Table을 선택한 뒤 SET을 통해 변경하고자 하는 
 ```php
 <?php
   session_start();
-  $title = "글 수";
+  $title = "글 수정";
   require_once('head.php');
 
   function fix_string($string){
@@ -1814,7 +1814,7 @@ UPDATE 명령어로 Table을 선택한 뒤 SET을 통해 변경하고자 하는 
 ```php
 <?php
   session_start();
-  $title = "글 작성하";
+  $title = "글 작성하기";
   require_once('head.php');
   if(isset($_SESSION['USERSESSION'])){
   echo '로그인 정보 ' . $_SESSION['NICKNAME'] . '<br>';
@@ -1975,7 +1975,7 @@ view 부분에 버튼을 추가해준다.
 ```php
 <?php
   session_start();
-  $title = "글 삭";
+  $title = "글 삭제";
   require_once('head.php');
   
   if(!isset($_SESSION['USERSESSION'])){
