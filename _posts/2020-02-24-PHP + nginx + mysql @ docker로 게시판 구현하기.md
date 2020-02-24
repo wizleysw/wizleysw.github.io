@@ -1589,3 +1589,220 @@ mysql> select * from FreeBoard;                                                 
     }
 ```
 
+### 게시판 글 수정 구현
+
+글에 대해 수정하는 루틴을 작성하고자 하는데 가장 좋은건 view 페이지 내부에서 리다이렉션을 하는 방법이다. 그러기 위해서는 작성자가 맞는지 검증이 필요하다. 
+
+```php
+<button type="button" onclick="location.href='javascript:history.back();'">뒤로가기</button>
+<button type="button" onclick="location.href='/modifyPage.php?no=<?php echo $no?>'">수정하기</button>
+```
+
+view.php에서 modifyPage.php로의 링크를 추가해준다.
+
+```php
+<?php
+  session_start();
+  $title = "글 수";
+  require_once('head.php');
+  if(isset($_SESSION['USERSESSION'])){
+  echo '로그인 정보 ' . $_SESSION['NICKNAME'] . '<br>';
+  echo '<a href="/logout.php">로그아웃</a>';
+  }
+?>
+
+<?php
+  if(!isset($_SESSION['USERSESSION'])){
+    echo '<script>alert("로그인이 필요합니다.");';
+    echo 'location.href="/loginForm.php";</script>';
+    exit;
+  }
+
+  function fix_string($string){
+    if(get_magic_quotes_gpc()) $string=stripslashes($string);
+    return htmlentities($string);
+  }
+  
+  $no="";
+  if(isset($_REQUEST['no'])){
+    $no=fix_string($_REQUEST['no']);
+  }
+
+  if($no<=0 or !$no){
+    echo '<script>alert("잘못된 접근입니다!");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  require_once('BoardDBConnect.php');
+  $query = "SELECT * FROM FreeBoard WHERE boardNo LIKE ?";
+  $stmt = $conn->stmt_init();
+  $stmt = $conn->prepare($query);
+  $stmt->bind_param("i", $no);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("잘못된 접근입니다!");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!($row['author'] == $_SESSION['nickname'])){
+    echo '<script>alert("글 작성자만 수정이 가능합니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+?>
+
+<form action="modify.php" method="POST">
+<input type="hidden" id="no" name="no" value="<?php echo $no?>">
+<input type="text" name="title" value="<?php echo $row['title'] ?>" style="width:300px;"><br>
+<input type="text" name="content" value="<?php echo $row['content'] ?>" style="width:300px;height:200px;"><br>
+<input type="password" name="password" placeholder="패스워드" required><br>
+<button type="submit">수정</button>
+<button type="button" onclick="location.href='javascript:history.back();'">뒤로가기</button>
+</form>
+```
+
+로직은 no를 넘겨준 뒤 쿼리를 조회한다. 그리고 정보가 존재하는 경우 author와 userID가 동일한지를 판단한 뒤 동일한 경우 내용을 form의 형태로 보여주게 된다. 그리고 password를 포함한 수정된 정보를 modify.php로 전송하면 해당 부분에서 검증 후에 업데이트가 진행되도록 할 것이다.
+
+```console
+mysql> select * from FreeBoard;
++---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+| boardNo | title       | author | time                | content | secret | secretPassword | permission |
++---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+|       1 | HelloWorld  | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          1 |
+|       2 | HelloWorld2 | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          1 |
+|       3 | HelloWorld2 | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          2 |
+|       4 | HelloWorld2 | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          3 |
+|       5 | HelloWorld2 | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      1 | abcdqwer       |          2 |
++---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+```
+
+다음과 같이 게시판이 있는데 UPDATE를 사용하여 수정할 것이다.
+
+```console
+mysql> UPDATE FreeBoard SET permission='2', author='abcd' WHERE boardNo='5';
+Query OK, 1 row affected (0.00 sec)
+mysql> select * from FreeBoard;
++---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+| boardNo | title       | author | time                | content | secret | secretPassword | permission |
++---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+|       1 | HelloWorld  | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          1 |
+|       2 | HelloWorld2 | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          1 |
+|       3 | HelloWorld2 | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          2 |
+|       4 | HelloWorld2 | Admin  | 2020-02-20 00:00:00 | ABCDEF  |      0 | NULL           |          3 |
+|       5 | HelloWorld2 | abcd   | 2020-02-20 00:00:00 | ABCDEF  |      1 | abcdqwer       |          2 |
++---------+-------------+--------+---------------------+---------+--------+----------------+------------+
+5 rows in set (0.00 sec)
+```
+
+UPDATE 명령어로 Table을 선택한 뒤 SET을 통해 변경하고자 하는 필드를, WHERE를 통해 조건을 주면 된다.
+
+```php
+<?php
+  session_start();
+  $title = "글 수";
+  require_once('head.php');
+
+  function fix_string($string){
+    if(get_magic_quotes_gpc()) $string=stripslashes($string);
+    return htmlentities($string);
+  }
+
+  $id=$_SESSION['USERSESSION'];
+  $no=$pw=$title=$content="";
+  if(isset($_REQUEST['password']))
+    $pw=fix_string($_REQUEST['password']);
+
+  if(isset($_REQUEST['title']))
+    $title=fix_string($_REQUEST['title']);
+
+  if(isset($_REQUEST['content']))
+    $content=fix_string($_REQUEST['content']);
+
+  if(isset($_REQUEST['no'])){
+    $no=fix_string($_REQUEST['no']);
+  }
+
+  if($no<=0 or !$no){
+    echo '<script>alert("잘못된 접근입니다!");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(strlen($pw)<4){
+    echo '<script>alert("패스워드를 다시 입력해주세요.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  require_once('UserDBconnect.php');
+  $query = "SELECT * FROM Account WHERE userID LIKE ?";
+  $stmt = $conn->stmt_init();
+  $stmt = $conn->prepare($query);
+  $stmt->bind_param("s", $id);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("잘못된 정보입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!($row['userID']==$id)){
+    echo '<script>alert("잘못된 정보입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!password_verify($pw, $row['password'])){
+    echo '<script>alert("패스워드가 잘못되었습니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  $conn2 = new mysqli("db", "wizley", "alpine", "Board");
+  if(!$conn2){
+    die("Connection Error!");
+  }
+  $query = "SELECT * FROM FreeBoard WHERE boardNo LIKE ?";
+  $stmt = $conn2->stmt_init();
+  $stmt = $conn2->prepare($query);
+  $stmt->bind_param("i", $no);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+  echo '<script>alert("잘못된 접근입니다!");';
+  echo 'history.back();</script>';
+  exit;
+  }
+
+  if(!($row['author'] == $_SESSION['nickname'])){
+    echo '<script>history.back();</script>';
+    exit;
+  }
+
+  $query = "UPDATE FreeBoard SET title=?, content=? WHERE boardNo=?";
+  $stmt = $conn2->stmt_init();
+  $stmt = $conn2->prepare($query);
+  $stmt->bind_param("ssi", $title, $content, $no);
+  $stmt->execute();
+
+  $stmt->close();
+  $conn->close();
+  $conn2->close();
+
+  echo '<script>alert("수정이 완료되었습니다.");';
+  echo 'history.go(-2);</script>';
+?>
+```
+
+들어온 정보를 수정하는 modify에서는 각각의 POST 필드에 대한 값 검사를 진행한 뒤, 넘어온 패스워드를 쿼리 조회를 통해 비교한다. 그 후 쿼리 조회를 통해 변경하고자 하는 게시물의 값을 가져와 author의 정보가 SESSION의 닉네임 정보와 일치하는지 한번 더 검사를 진행한 뒤에 UPDATE를 통해 수정을 하게 된다. 그 후 2페이지 전으로 go를 통해 돌아가는 루틴을 가지게 된다. 
