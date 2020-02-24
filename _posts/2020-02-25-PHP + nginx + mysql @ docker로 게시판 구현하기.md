@@ -2175,3 +2175,135 @@ board.php에 다음과 같은 form을 생성하였다. 이제 form의 결과를 
 
 hello라는 검색에 대하여 쿼리 조회를 통해 게시물들을 출력하는 것을 확인할 수 있다!. 이제 기본적인 게시판 관련 구현은 마무리가 되었다. 혹시나 더 진도를 나가고 싶은 분들은 게시물의 개수에 따른 페이지 구현 및 댓글 기능등을 추가로 구현해보는 것도 좋을 것 같다. 
 
+### 회원탈퇴 구현
+
+회원탈퇴 구현의 방법은 2가지로 나눌 수 있을 것이다. 게시물을 다 함께 삭제하는 것과 계정만 삭제하는 것이다. 나의 경우에는 계정은 삭제하되 게시물들은 permission 3번으로 업데이트하는 방식으로 진행할 것이다. 탈퇴의 경우 그냥 정보를 날리면 되서 간단한 편이다.
+
+```php
+<?php
+  session_start();
+  if(isset($_SESSION['USERSESSION'])){
+  echo '로그인 정보 ' . $_SESSION['NICKNAME'] . '<br>';
+  echo '<button type="button" onclick="location.href=\'/logout.php\'">로그아웃</button>';
+  echo '<button type="button" onclick="location.href=\'/deactivate.php\'">회원탈퇴</button>';
+  }
+
+  else{
+    echo '<script>alert("로그인 페이지로 이동합니다.");';
+    echo 'location.href="/loginForm.php";</script>';
+  }
+?>
+```
+
+index.php에 버튼하나를 추가해준다.
+
+```php
+<?php
+  session_start();
+  $title = "회원탈퇴";
+  require_once('head.php');
+  
+  if(!isset($_SESSION['USERSESSION'])){
+    echo '<script>alert("로그인이 필요합니다.");';
+    echo 'location.href="/loginForm.php";</script>';
+    exit;
+  }
+
+  function fix_string($string){
+    if(get_magic_quotes_gpc()) $string=stripslashes($string);
+    return htmlentities($string);
+  }
+?>
+
+<form action="/leaveAccount.php" method="POST">
+계정 삭제 시 복구가 불가능합니다. 계속 진행하시려면 패스워드를 입력해주세요.<br>
+<input type="hidden" id="no" name="no" value="<?php echo $no?>">
+<input type="password" name="password" placeholder="패스워드" required><br>
+<button type="submit">회원탈</button>
+<button type="button" onclick="location.href='/board.php'">취소</button>
+</form>
+```
+
+이동 페이지 부분에 password를 입력하는 창을 만들어 준다. 
+
+```php
+<?php
+  session_start();
+  $title = "회원탈퇴";
+  require_once('head.php');
+
+  function fix_string($string){
+    if(get_magic_quotes_gpc()) $string=stripslashes($string);
+    return htmlentities($string);
+  }
+
+  $id=$_SESSION['USERSESSION'];
+  $no=$pw;
+  if(isset($_REQUEST['password']))
+    $pw=fix_string($_REQUEST['password']);
+
+  if(strlen($pw)<4){
+    echo '<script>alert("패스워드를 다시 입력해주세요.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  require_once('UserDBconnect.php');
+  $query = "SELECT * FROM Account WHERE userID LIKE ?";
+  $stmt = $conn->stmt_init();
+  $stmt = $conn->prepare($query);
+  $stmt->bind_param("s", $id);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("잘못된 정보입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!($row['userID']==$id)){
+    echo '<script>alert("잘못된 정보입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!password_verify($pw, $row['password'])){
+    echo '<script>alert("패스워드가 잘못되었습니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  $conn2 = new mysqli("db", "wizley", "alpine", "Board");
+  if(!$conn2){
+    die("Connection Error!");
+  }
+
+  $permission = 3;
+  $query = "UPDATE FreeBoard SET permission=? WHERE author=?";
+  $stmt = $conn2->stmt_init();
+  $stmt = $conn2->prepare($query);
+  $stmt->bind_param("is", $permission , $_SESSION['NICKNAME']);
+  $stmt->execute();
+
+  $query = "DELETE FROM Account WHERE userID=?";
+  $stmt = $conn->stmt_init();
+  $stmt = $conn->prepare($query);
+  $stmt->bind_param("s", $id);
+  $stmt->execute();
+
+  $stmt->close();
+  $conn->close();
+  $conn2->close();
+
+  echo '<script>alert("회원탈퇴가 완되었습니다.");';
+  echo 'location.href="/logout.php";</script>';
+?>
+```
+
+내부적으로 처리하는 루틴은 다른 루틴과 비슷하게 password에 대한 검증을 진행한 뒤에 UPDATE를 통해 해당 사용자의 게시글의 permission을 3으로 변경한다. 그 뒤 DELETE를 통해 Account에서 userID로 검색하여 삭제하는 루틴이 실행된다. 이를 통해 회원탈퇴까지 구현이 모두 완료되었다!!
+
+
+
+
