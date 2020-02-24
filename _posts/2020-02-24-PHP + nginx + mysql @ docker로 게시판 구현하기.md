@@ -1801,8 +1801,164 @@ UPDATE 명령어로 Table을 선택한 뒤 SET을 통해 변경하고자 하는 
   $conn2->close();
 
   echo '<script>alert("수정이 완료되었습니다.");';
-  echo 'history.go(-2);</script>';
+  echo 'location.href="/board.php";</script>';
 ?>
 ```
 
 들어온 정보를 수정하는 modify에서는 각각의 POST 필드에 대한 값 검사를 진행한 뒤, 넘어온 패스워드를 쿼리 조회를 통해 비교한다. 그 후 쿼리 조회를 통해 변경하고자 하는 게시물의 값을 가져와 author의 정보가 SESSION의 닉네임 정보와 일치하는지 한번 더 검사를 진행한 뒤에 UPDATE를 통해 수정을 하게 된다. 그 후 2페이지 전으로 go를 통해 돌아가는 루틴을 가지게 된다. 
+
+### 게시판 글 작성 구현
+
+사실상 사람에 따라 이부분을 가장 먼저 구현하기도 할 것 같은데 어쩌다보니 우선순위에서 밀렸다. 방법은 Register와 비슷하다. 
+
+```php
+<?php
+  session_start();
+  $title = "글 작성하";
+  require_once('head.php');
+  if(isset($_SESSION['USERSESSION'])){
+  echo '로그인 정보 ' . $_SESSION['NICKNAME'] . '<br>';
+  echo '<a href="/logout.php">로그아웃</a>';
+  }
+
+  if(!isset($_SESSION['USERSESSION'])){
+    echo '<script>alert("로그인이 필요합니다.");';
+    echo 'location.href="/loginForm.php";</script>';
+    exit;
+  }
+
+?>
+<meta charset="utf-8">
+
+<form action="/add.php" method="POST">
+제목 : <input type="text" name="title" placeholder="제목" style="width:300px;" required><br>
+내용 : <input type="text" name="content" placeholder="내용" style="width:300px;height:200px;" required><br>
+비밀글 여부 : <input type="checkbox" name="secret" placeholder="비밀">
+전체공개 여부 : <input type="checkbox" name="permission" placeholder="공개여부"><br>
+패스워드 : <input type="password" name="password" placeholder="패스워드" required><br>
+<button type="submit">작</button>
+<button type="button" onclick="location.href='javascript:history.back();'">뒤로가기</button>
+</form>
+```
+
+글 작성에 대해서는 로그인한 사용자만 허용할 것이므로 위와 같이 조건식을 맞춘 뒤에 폼을 작성하였다.
+
+```php
+<?php
+  session_start();
+  $title = "글 등록";
+  require_once('head.php');
+
+  function fix_string($string){
+    if(get_magic_quotes_gpc()) $string=stripslashes($string);
+    return htmlentities($string);
+  }
+
+  $id=$_SESSION['USERSESSION'];
+  $pw=$title=$content="";
+  if(isset($_REQUEST['password']))
+    $pw=fix_string($_REQUEST['password']);
+
+  if(isset($_REQUEST['title']))
+    $title=fix_string($_REQUEST['title']);
+
+  if(isset($_REQUEST['content']))
+    $content=fix_string($_REQUEST['content']);
+
+  if(strlen($pw)<4){
+    echo '<script>alert("패스워드를 다시 입력해주세요.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(strlen($title)<1){
+    $title='제목없음';
+  }
+
+  if(strlen($content)<1){
+    $content='내용없음';
+  }
+
+  require_once('UserDBconnect.php');
+  $query = "SELECT * FROM Account WHERE userID LIKE ?";
+  $stmt = $conn->stmt_init();
+  $stmt = $conn->prepare($query);
+  $stmt->bind_param("s", $id);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  $row = mysqli_fetch_array($result);
+
+  if(!$row){
+    echo '<script>alert("잘못된 정보입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!($row['userID']==$id)){
+    echo '<script>alert("잘못된 정보입니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  if(!password_verify($pw, $row['password'])){
+    echo '<script>alert("패스워드가 잘못되었습니다.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  $secret=0;
+  $secretPassword = password_hash($pw, PASSWORD_DEFAULT);
+  if(isset($_REQUEST['secret'])){
+    $secret=1;
+  }
+
+  $permission=2;
+  if(isset($_REQUEST['permission'])){
+    $permission=1;
+  }
+
+  $dateNow = date("Y-m-d H:i:s");
+
+  $conn2 = new mysqli("db", "wizley", "alpine", "Board");
+  if(!$conn2){
+    die("Connection Error!");
+  }
+
+  $query = "
+    INSERT INTO FreeBoard(title, author, time, content, secret, secretPassword, permission)
+    VALUES(?,?,'$dateNow',?,?,?,?)
+  ";
+
+  $stmt = $conn2->stmt_init();
+  $stmt = $conn2->prepare($query);
+  $stmt->bind_param("sssisi", $title, $_SESSION['NICKNAME'], $content, $secret, $secretPassword, $permission);
+  if(!$stmt->execute()){
+    echo '<script>alert("정보를 다시 확인해주세요.");';
+    echo 'history.back();</script>';
+    exit;
+  }
+
+  $stmt->close();
+  $conn->close();
+  $conn2->close();
+
+  echo '<script>alert("작성이 완료되었습니다.");';
+  echo 'history.go(-2);</script>';
+?>
+```
+
+secretPassword의 값은 사용자의 패스워드를 해쉬한 값을 사용하였고, 그 여부는 checkbox의 결과에 따라 다르게 처리된다. 그리고 해당 부분을 작성하고 난 뒤 secret 부분에 대한 점검을 진행하던 중 패스워드가 올바르지 않다는 결과가 계속 출력이 되었다. 알고봤더니 password_verfiy의 인자 순서가 중요했다.
+
+```php
+      if(!password_verify($secretKey, $row['secretPassword'])){
+        echo '<script>alert("패스워드를 잘못 입력하셨습니다.");';
+        echo "location.href='/secretBoard.php?no={$no}';</script>";
+        exit;
+      }
+```
+
+view.php에서 해당 부분의 변수의 위치를 변경하자 정상적으로 작동하는 것을 확인할 수 있었다. 마이너한 로직 버그를 곳곳에 수정을 해주고 나면 작성하는 기능도 완료된다!
+
+
+
+
