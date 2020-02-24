@@ -1364,7 +1364,7 @@ mysql> select * from FreeBoard;                                                 
 
     if($no<=0 or !$no){
       echo '<script>alert("잘못된 접근입니다!");';
-      echo 'location.href="/board.php";</script>';
+      echo 'history.back();</script>';
       exit;
     }
 
@@ -1452,6 +1452,140 @@ mysql> select * from FreeBoard;                                                 
 ![view](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/view.png)
 
 
+이제 view 부분에서 제목을 클릭하면 해당 게시물로 이동하도록 설계를 마무리하면 된다.
 
+```php
+<div id="board">
+  <table>
+    <tr>
+      <th>번호</th>
+      <th>제목</th>
+      <th>열람여부</th>
+      <th>닉네임</th>
+      <th>작성일</th>
+    </tr>
 
+    <?php
+      require_once('BoardDBConnect.php');
+      $count = 0;
+      $query = "SELECT* FROM FreeBoard";
+      $stmt = $conn->stmt_init();
+      $stmt = $conn->prepare($query);
+      $stmt->execute();
+      $result = $stmt->get_result();
+      while($row = mysqli_fetch_array($result)){
+        $count += 1;
+        echo "<tr>";
+        echo "<td>{$count}</td>";
+        echo "<td><a href='/view.php?no={$row['boardNo']}'>{$row['title']}</a></td>";
+        if($row['secret']==1){
+          echo "<td>비밀글</td>";
+        }
+        else if($row['permission']==1){
+          echo "<td>전체공개</td>";
+        }
+        else{
+          echo "<td>회원전용</td>";
+        }
+        echo "<td>{$row['author']}</td>";
+        echo "<td>{$row['time']}</td>";
+      }
+      $stmt->close();
+      $conn->close();
+    ?>
+  </table>
+</div>
+```
+
+이제 비밀글 부분을 해결할 차례이다. 기존 게시판과는 또 다르게 비밀글에 대한 패스워드를 입력하는 루틴이 추가적으로 필요하다. 
+
+```php
+<?php
+  session_start();
+  $title = "글 보기";
+  require_once('head.php');
+  if(isset($_SESSION['USERSESSION'])){
+  echo '로그인 정보 ' . $_SESSION['NICKNAME'] . '<br>';
+  echo '<a href="/logout.php">로그아웃</a>';
+  }
+?>
+<meta charset="utf-8">
+<body>
+<?php
+    function fix_string($string){
+      if(get_magic_quotes_gpc()) $string=stripslashes($string);
+      return htmlentities($string);
+    }
+
+    $no="";
+    if(isset($_GET['no']))
+      $no=fix_string($_GET['no']);
+
+    if($no<=0 or !$no){
+      echo '<script>alert("잘못된 접근입니다!");';
+      echo 'history.back();</script>';
+      exit;
+    }
+?>
+  <form action="/view.php" method="POST">
+    <input type="hidden" id="no" name="no" value="<?php echo $no?>">
+    <input type="secretPassword" id="secretPassword" name="secretPassword" placeholder="패스워드" required><br>
+    <button type="submit">확인</button>
+    <a href="/board.php">돌아가기</a>
+  </form>
+</body>
+</html>
+```
+
+패스워드를 입력받는 secretBoard.php를 생성하였다. 해당 부분에서는 패스워드를 입력받는데 no에 대한 정보의 유치를 위해서 hidden 타입으로 추가하였다. 이제 POST데이터로 secretPassword를 받은 내용을 처리해주는 코드를 view에 추가하면 된다.
+
+```php
+    if(isset($_REQUEST['no'])){
+      $no=fix_string($_REQUEST['no']);
+    }
+
+    if(isset($_REQUEST['secretPassword'])){
+      $secretKey=fix_string($_REQUEST['secretPassword']);
+    }
+```
+
+기존의 GET파라미터 형식의 no를 REQUEST로 바꿈으로써 get과 post형식을 동시에 지원하게 된다. 
+
+```php
+    if($row['secret'] == 1){
+      if(strlen($secretKey)<1){
+        echo '<script>alert("비밀글입니다.");';
+        echo "location.href='/secretBoard.php?no={$no}';</script>";
+        exit;
+      }
+
+      if($row['secretPassword'] == $secretKey){
+        echo '<script>alert("right!"");</script>';
+      }
+
+      else{
+        echo '<script>alert("패스워드를 잘못 입력하셨습니다.");';
+        echo "location.href='/secretBoard.php?no={$no}';</script>";
+        exit; 
+      }
+    }
+```
+
+그리고 비밀글 부분의 루틴에서 password를 입력받았는지를 판단한 뒤 쿼리 조회결과와 비교하여 같은 경우에는 밑의 루틴을 실행하며 다른 경우에는 다시 secretBoard.php로 리다이렉트를 하도록 하였다. 이제 해당 부분에서 password와 같이 평문형식으로 오가는 값에 대한 조건 변경을 아래와 같이 진행하면 대략적인 구현이 마무리된다.
+
+```php
+    if($row['secret'] == 1){
+      if(strlen($secretKey)<1){
+        echo '<script>alert("비밀글입니다.");';
+        echo "location.href='/secretBoard.php?no={$no}';</script>";
+        exit;
+      }
+
+      if(!password_verify($row['secretPassword'], $secretKey)){
+        echo '<script>alert("패스워드를 잘못 입력하셨습니다.");';
+        echo "location.href='/secretBoard.php?no={$no}';</script>";
+        exit;
+      }
+    }
+```
 
