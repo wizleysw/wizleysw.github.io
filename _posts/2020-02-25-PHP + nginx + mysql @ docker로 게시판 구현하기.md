@@ -2322,8 +2322,7 @@ https://html5up.net/astral
 
 ## GITHUB link
 
-https://github.com/wizleysw/php_board
-
+[php_board 결과물](https://github.com/wizleysw/php_board)
 
 
 
