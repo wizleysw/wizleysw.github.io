@@ -2219,7 +2219,7 @@ index.php에 버튼하나를 추가해준다.
 계정 삭제 시 복구가 불가능합니다. 계속 진행하시려면 패스워드를 입력해주세요.<br>
 <input type="hidden" id="no" name="no" value="<?php echo $no?>">
 <input type="password" name="password" placeholder="패스워드" required><br>
-<button type="submit">회원탈</button>
+<button type="submit">회원탈퇴</button>
 <button type="button" onclick="location.href='/board.php'">취소</button>
 </form>
 ```
@@ -2303,6 +2303,26 @@ index.php에 버튼하나를 추가해준다.
 ```
 
 내부적으로 처리하는 루틴은 다른 루틴과 비슷하게 password에 대한 검증을 진행한 뒤에 UPDATE를 통해 해당 사용자의 게시글의 permission을 3으로 변경한다. 그 뒤 DELETE를 통해 Account에서 userID로 검색하여 삭제하는 루틴이 실행된다. 이를 통해 회원탈퇴까지 구현이 모두 완료되었다!!
+
+## Template
+
+너무 못생긴 사이트에 템플릿을 약간 입혀볼까 한다. 프론트를 전혀 할 줄 모르기에 이뻐보이는 테마를 하나 골랐다.
+
+https://html5up.net/astral
+
+동적으로 렌더링되는데 사용되는 HTML 템플릿같은데 잘 모르기때문에 스태틱으로 대충 넣어서 바꿔보았다.
+
+![login](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/login.png)
+ 
+로그인을 하게 되면 다음과 같은 페이지를 만날 수 있다.
+
+![login_board](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/php_board/login_board.png)
+
+그리고 게시판을 보면 그 전과 달리 조금은 예뻐진 것을 확인할 수 있다. 이렇게 대략 5일정도 2020년도의 첫 번째 프로젝트의 개발을 완료하였다!.
+
+## GITHUB link
+
+https://github.com/wizleysw/php_board
 
 
 
