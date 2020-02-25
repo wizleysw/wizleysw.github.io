@@ -1,7 +1,7 @@
 ---
 published: true
 layout: single
-title : "Django + REST + SQLite @ docker로 음식관련 서비스 개발하기"
+title : "Django + REST + SQLite @ docker로 FoodFinder 서비스 개발하기"
 category : dev
 comments: false
 author_profile : true
