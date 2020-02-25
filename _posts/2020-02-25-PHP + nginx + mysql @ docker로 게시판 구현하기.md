@@ -5,7 +5,10 @@ title : "PHP + nginx + mysql @ docker로 게시판 구현하기"
 category : dev
 comments: false
 author_profile : true
-tag : PHP
+tag : 
+  - PHP
+  - docker
+  - nginx
 toc : true
 ---
 

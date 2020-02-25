@@ -5,7 +5,10 @@ title : "Django + REST + SQLite @ docker로 음식관련 서비스 개발하기"
 category : dev
 comments: false
 author_profile : true
-tag : Django
+tag : 
+	- Django
+	- REST
+	- docker
 toc : true
 ---
 
@@ -34,4 +37,28 @@ toc : true
 3. 관리자
 
 세부적인 사항은 DB를 설계하게 되면 그 때 더 심층적으로 고민을 해보도록 하고 지금해야할 것은 REST api와 Docker에 대해 이해하는 것과 그에 따라 docker-compose파일을 작성하는 것이다. 그러면 먼 여정을 시작해보도록 하자.
+
+## Settings
+
+### Django
+
+장고는 MVT 구조를 채택하고 있다. 아래의 링크를 통해 해당 부분을 공부할 수 있다.
+
+[Django MVT 패턴](https://butter-shower.tistory.com/49?category=718374)
+
+장고는 python 기반으로 구현되었기 때문에 python 문법을 알면 개발이 가능하다는 특장점이 있으며, 정해진 규칙에 의거하여 개발을 진행해야 하기 때문에 딴 사람의 코드에 대한 이해가 쉽고 개발을 오래하여 구현에 익숙해지면 쉽다는 장점이 있다. 
+
+### REST FrameWork
+
+이 주제도 아래의 링크에 잘 설명되어 있다.
+
+[REST API란](https://gmlwjd9405.github.io/2018/09/21/rest-and-restful.html)
+
+얘를 왜 쓰고싶었냐면 안드로이드/웹 등의 멀티 플랫폼 개발에서 효율적으로 사용될 뿐만 아니라 POST/GET 등의 HTTP 메소드를 통해 API를 구현하기 때문에 형식적이고 간단하다는 느낌이 들었다. 아직 제대로 활용을 안해봤기 때문에 사용하면서 느껴봐야 할 것 같다.
+
+### Docker Setting
+
+이번에는 Docker에 Django 세팅이 필요하다. python2의 지원이 만료되는 시점에서 python3를 사용하는게 좋을것같기에 Ubuntu 이미지 내부에 Django 및 REST framework를 설치하는 방식을 사용하기로 하였다.
+
+
 
