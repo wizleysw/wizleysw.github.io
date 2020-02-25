@@ -5,7 +5,7 @@ title : "Django + REST + SQLite @ docker로 음식관련 서비스 개발하기"
 category : dev
 comments: false
 author_profile : true
-tag : Django, REST
+tag : Django
 toc : true
 ---
 
