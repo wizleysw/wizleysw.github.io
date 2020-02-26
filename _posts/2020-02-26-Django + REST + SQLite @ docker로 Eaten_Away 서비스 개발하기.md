@@ -56,11 +56,11 @@ toc : true
 
 얘를 왜 쓰고싶었냐면 안드로이드/웹 등의 멀티 플랫폼 개발에서 효율적으로 사용될 뿐만 아니라 POST/GET 등의 HTTP 메소드를 통해 API를 구현하기 때문에 형식적이고 간단하다는 느낌이 들었다. 아직 제대로 활용을 안해봤기 때문에 사용하면서 느껴봐야 할 것 같다.
 
-### Docker Setting
+### Dockerfile 
 
 이번에는 Docker에 Django 세팅이 필요하다. python2의 지원이 만료되는 시점에서 python3를 사용하는게 좋을것같기에 Ubuntu 이미지 내부에 Django 및 REST framework를 설치하는 방식을 사용하기로 하였다. 자 그럼 도커파일을 먼저 만들어야 되는데 Django같은 경우 Ubuntu 또는 Python 이미지를 베이스로 생성을 한다. python3 이미지를 사용하면 pip / python3에 대한 버전관리가 되며 이미지 용량이 Ubuntu보다 가볍기 때문에 Python 이미지를 베이스로 사용하는 것이 좋을 것 같았다.
 
-그래서 다음과 같이 초기 dockerfile을 만들었다.
+그래서 다음과 같이 초기 Dockerfile을 만들었다.
 
 ```console
 FROM python:3
@@ -204,5 +204,122 @@ ENTRYPOINT \
 
 이제 다시 image를 빌드한 뒤 run을 시키게 되면 기본 container를 돌릴 수 있다.
 
+### docker-compose
 
+자 이제는 compose 파일을 만들차례이다. 이번에는 PHP 프로젝트와 달리 일단은 하나의 컨테이너만을 사용할 예정이기 때문에 network 설정은 하지 않도록 한다. 
+(여기서 엄청나게 삽질을 시작하였다...)
 
+지금까지 ENTRYPOINT로 호출했었는데 한번만 startproject가 실행되어야 하므로 결론적으로 Dockerfile을 다음과 같이 변경하였다.
+
+```console
+FROM python:3
+
+MAINTAINER Wizley <wizley@kakao.com>
+
+WORKDIR /code
+COPY ./requirements.txt /code
+COPY ./docker-entrypoint.sh /code
+
+RUN pip3 install -r ./requirements.txt
+```
+
+그리고 docker-compose를 다음과 같이 작성하였다.
+
+```console
+version: '3'
+
+services:
+ django:
+  container_name: django_eatenAway
+  image: django:1.0
+  environment:
+    - DJANGO_DEBUG=true
+  volumes:
+    - ./code:/code
+  ports:
+    - "8000:8000"
+  tty: true
+  command: python3 ./eatenAway/manage.py runserver 0:8000
+ ```
+
+ 맨처음에는 command가 없이 실행을 한 뒤 code 내부에 옮겨둔 docker-entrypoint.sh를 실행시킨다.
+
+ ```sh
+django-admin startproject eatenAway
+python $(pwd)/eatenAway/manage.py makemigrations
+python $(pwd)/eatenAway/manage.py migrate
+echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser('root', 'wizley@github.com', 'alpine')" | python3 $(pwd)/eatenAway/manage.py shell
+```
+
+그 후에 command를 추가하는 방식으로 진행하면 빌드에 성공할 수 있다. 자 이제 다시 명령어를 입력한다.
+
+```console
+docker build --tag django:1.0 . ; docker-compose up
+
+Recreating django_eatenAway ... done
+Attaching to django_eatenAway
+django_eatenAway | Python 3.8.1 (default, Feb  2 2020, 08:37:37)
+django_eatenAway | [GCC 8.3.0] on linux
+django_eatenAway | Type "help", "copyright", "credits" or "license" for more information.
+```
+
+그리고 컨테이너 내부로 접속한다.
+
+```console
+Wizley:~/Project/Django/eatenAway # cat shell.sh
+docker exec -it django_eatenAway /bin/bash
+Wizley:~/Project/Django/eatenAway # sh shell.sh
+root@f7aadb20f3c1:/code#
+```
+
+code에 넣어둔 docker-entrypoint.sh 파일을 실행시키게 되면 
+
+```console
+root@f7aadb20f3c1:/code# sh docker-entrypoint.sh
+No changes detected
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, sessions
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying auth.0001_initial... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying sessions.0001_initial... OK
+
+root@f7aadb20f3c1:/code# ls -al
+total 8
+drwxr-xr-x 4 root root  128 Feb 26 14:36 .
+drwxr-xr-x 1 root root 4096 Feb 26 14:35 ..
+-rw-r--r-- 1 root root  319 Feb 26 14:15 docker-entrypoint.sh
+drwxr-xr-x 5 root root  160 Feb 26 14:36 eatenAway
+```
+
+project로 eatenAway가 생성되는 것을 확인할 수 있다. 이제 컴포즈에 윗 부분의 runserver를 추가하면 아래와 같이 up을 통하여 서버를 구동할 수 있다.
+
+```console
+Wizley:~/Project/Django/eatenAway # docker-compose up
+Recreating django_eatenAway ... done
+Attaching to django_eatenAway
+django_eatenAway | Watching for file changes with StatReloader
+django_eatenAway | Performing system checks...
+django_eatenAway |
+django_eatenAway | System check identified no issues (0 silenced).
+django_eatenAway | February 26, 2020 - 14:37:39
+django_eatenAway | Django version 3.0.3, using settings 'eatenAway.settings'
+django_eatenAway | Starting development server at http://0:8000/
+django_eatenAway | Quit the server with CONTROL-C.
+```
+
+이제 기본적인 docker 세팅이 끝났다.
