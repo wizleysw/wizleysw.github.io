@@ -323,3 +323,258 @@ django_eatenAway | Quit the server with CONTROL-C.
 ```
 
 이제 기본적인 docker 세팅이 끝났다.
+
+## django help
+
+Django를 python2버전을 사용해서 동아리 신입생 지원사이트를 만들어본 뒤로 건드려본 적이 없기 때문에 가물가물한 기억에 의존해서 개발을 하는 것보다 처음 접한다는 생각으로 공부에 접근하고자 한다. 이에는 아래의 사이트가 많은 도움이 되 줄 것이다.
+
+[django documentation](https://docs.djangoproject.com/en/3.0/)
+
+### superuser
+
+프레임워크의 help를 보면 어떤 기능이 존재하는지 대략적으로 알아낼 수 있다. 그렇기에 help 명령어를 통해 사용가능한 옵션을 확인해보았다.
+
+```console
+root@50a2c9a1cf4b:/code/eatenAway# python manage.py help
+
+Type 'manage.py help <subcommand>' for help on a specific subcommand.
+
+Available subcommands:
+
+[auth]
+    changepassword
+    createsuperuser
+
+[contenttypes]
+    remove_stale_contenttypes
+
+[django]
+    check
+    compilemessages
+    createcachetable
+    dbshell
+    diffsettings
+    dumpdata
+    flush
+    inspectdb
+    loaddata
+    makemessages
+    makemigrations
+    migrate
+    sendtestemail
+    shell
+    showmigrations
+    sqlflush
+    sqlmigrate
+    sqlsequencereset
+    squashmigrations
+    startapp
+    startproject
+    test
+    testserver
+
+[sessions]
+    clearsessions
+
+[staticfiles]
+    collectstatic
+    findstatic
+    runserver
+```
+
+auth 카테고리는 superuser를 추가하거나 password 변경에 사용하는 것 같고 초기에 docker-entrypoint.sh를 통해 root / alpine이라는 superuser를 생성했었다. localhost:8000/admin/ 페이지에서 해당 정보로 로그인을 시도하여 성공하는 것을 통해 정상적으로 계정이 등록되었음으로 확인할 수 있다.
+
+이제 여기서 하나의 궁금증이 생겼다. 그렇다면 이렇게 등록한 superuser는 어디에 저장이 되는걸까?
+
+[django.contrib.auth](https://docs.djangoproject.com/en/3.0/ref/contrib/auth/#django.contrib.auth.models.User.is_superuser)
+
+django.contrib.auth.models import User 명령어를 통해 User정보를 가져오며 그 내부에 is_superuser라는 값이 존재한다고 한다. 눈으로 직접 있는지 확인을 하기 위해서 찾아 들어가보자.
+
+```console
+root@50a2c9a1cf4b:/code/eatenAway# python -m site
+sys.path = [
+    '/code/eatenAway',
+    '/usr/local/lib/python38.zip',
+    '/usr/local/lib/python3.8',
+    '/usr/local/lib/python3.8/lib-dynload',
+    '/usr/local/lib/python3.8/site-packages',
+]
+USER_BASE: '/root/.local' (doesn't exist)
+USER_SITE: '/root/.local/lib/python3.8/site-packages' (doesn't exist)
+ENABLE_USER_SITE: True
+```
+
+python 명령어로 package의 위치를 파악한다. 그리고 내부로 들어가보았다.
+
+```console
+root@50a2c9a1cf4b:/usr/local/lib/python3.8/site-packages/django/contrib/auth# ls
+__init__.py  apps.py	   checks.py		    decorators.py  hashers.py  middleware.py  models.py		      templates  validators.py
+__pycache__  backends.py   common-passwords.txt.gz  forms.py	   locale      migrations     password_validation.py  tokens.py  views.py
+admin.py     base_user.py  context_processors.py    handlers	   management  mixins.py      signals.py	      urls.py
+```
+
+여기에 models.py가 존재한다.
+
+```python
+def create_superuser(self, username, email=None, password=None, **extra_fields):
+    extra_fields.setdefault('is_staff', True)
+    extra_fields.setdefault('is_superuser', True)
+
+    if extra_fields.get('is_staff') is not True:
+        raise ValueError('Superuser must have is_staff=True.')
+    if extra_fields.get('is_superuser') is not True:
+        raise ValueError('Superuser must have is_superuser=True.')
+
+    return self._create_user(username, email, password, **extra_fields)
+```
+
+내부에서 create_superuser 부분을 보면 is_superuser라는 field를 설정하는 것을 확인할 수 있다. 그리고 이 값은 어디에 저장되는고 하고 보니 sqlite3의 db안에서 찾을 수 있었다.
+
+![superuser](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/superuser.png)
+
+is_superuser필드가 1인 상태로 저장되어 있다. 이렇게 django에서는 User 인스턴스에 대한 관리를 수행한다는 것을 눈으로 확인할 수 있었다.
+
+### stale contenttype
+
+stale contenttype이 먼지 잘 모르겠어서 찾아봤더니 만약 어떤 model이 deleted된 상태일 때 그 모델과 관련된 권한(permission)과 같은 정보들을 stale contenttpye이라고 하는 것 같다. 그래서 해당 명령어를 통해 명시한 더이상 필요하지 않은 정보들을 정리하는 역할을 수행하는 것 같다. 해당 옵션은 optional이기 때문에 이를 위해서는 추가적인 세팅이 필요하다.
+
+### check
+
+django-admin check를 통해 실행되는 명령어인데 주로 데이터베이스 변경 등의 상황에서 검사를 위해 사용되는 것 같다.
+
+### createcachetable
+
+데이터베이스 캐시 테이블을 생성할 때 사용하는 명령어인것 같다.
+
+[장고 커맨드라인 명령어](https://orashelter.tistory.com/50)
+
+그 외의 나머지 명령어들에 대한 설명이 해당 블로그에 잘 되어 있어서 대체하도록 하겠다.
+
+## Django project/app
+
+### project
+
+젤 처음에 eatenAway라는 프로젝트를 생성하였었고 그로 인하여 eatenAway라는 새로운 폴더가 생성이 되었다. 현재 시점에서 해당 구조를 확인해보면 아래와 같이 나타나는 것을 확인할 수 있다. 
+
+```console
+root@50a2c9a1cf4b:/code# tree eatenAway/
+eatenAway/
+├── db.sqlite3
+├── eatenAway
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-38.pyc
+│   │   ├── settings.cpython-38.pyc
+│   │   ├── urls.cpython-38.pyc
+│   │   └── wsgi.cpython-38.pyc
+│   ├── asgi.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+└── manage.py
+
+2 directories, 11 files
+```
+
+장고 프레임워크는 Project과 App으로 구분할 수 있는데 프로젝트는 개발 대상이 되는 통짜의 전체 프로그램을 의미하고 프로젝트 내부의 세부적인 서브 프로그램들을 어플리케이션으로 표현한다고 한다. 즉 각각의 부분을 서브 프로그램인 앱으로 개발을 한 뒤에 프로젝트 레벨에서 통합을 한 모습이 장고라고 할 수 있다.
+
+내부를 보면 asgi.py, settings.py, urls.py wsgi.py가 eatenAway라는 하위 디렉토리 안에 존재하는데 각각은 다음과 같은 역할을 수행한다.
+
+1) asgi.py : ASGI 프로토콜과 연결을 위한 설정 파일
+2) settings.py : 프로젝트 설정 파일
+3) urls.py : URL패턴을 설정하는 최상위 파일(하위 디렉토리 내에도 urls.py 존재)
+4) wsgi.py : 상용 웹 서버와 물리기 위한 설정 파일
+
+### app
+
+자 이제 user에 대한 관리를 수행할 앱을 만들어보자. 이름으로 정말 많은 시간 고민을 했는데 걍 user를 쓰기로 하였다.
+
+```console
+django-admin startapp user
+```
+
+이제 tree로 확인을 해보면 아래와 같이 user내부에 여러개의 파일이 생성된 것을 확인할 수 있다. 
+
+```console
+.
+├── db.sqlite3
+├── eatenAway
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-38.pyc
+│   │   ├── settings.cpython-38.pyc
+│   │   ├── urls.cpython-38.pyc
+│   │   └── wsgi.cpython-38.pyc
+│   ├── asgi.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+├── manage.py
+└── user
+    ├── __init__.py
+    ├── admin.py
+    ├── apps.py
+    ├── migrations
+    │   └── __init__.py
+    ├── models.py
+    ├── tests.py
+    └── views.py
+```
+
+메인 앱과는 다르게 django의 MVT 모델로 활용되는 models.py와 views.py가 추가된 것을 확인할 수 있다. 
+
+## settings.py
+
+장고의 많은 부분과 연관된 값들이 저장되 있는 settings.py를 보면 DB, language, APP list 그리고 SECRET_KEY 값들이 존재한다. 배포 시에 여러가지를 신경써야겠지만 SECRET_KEY 꼭 고려를 해야되는 부분이다.
+
+### SECRET_KEY
+
+장고의 settings.py 부분을 보면 SECRET_KEY가 존재한다.
+
+```python
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = '78bpynx(+e(1(c-=@_!3-l1@xi)_)v4w=3+n=%$9=z28-u9inz'
+```
+
+아래의 블로그에는 해당 값에 내용이 잘 설명되어 있다.
+
+[Django - settings.py 의 SECRET_KEY 변경 및 분리하기](https://wayhome25.github.io/django/2017/07/11/django-settings-secret-key/)
+
+이 값을 설정하는 방법에는 환경변수와 비밀파일 2가지가 존재하는데 비밀파일 방식을 적용해보고자 한다. json파일을 생성하여 50자리의 임의의 값을 설정한 뒤 해당 값을 가져오도록 코드를 변경하면 된다고 한다.
+
+```json
+root@50a2c9a1cf4b:/code/eatenAway/eatenAway# cat secret.json
+{
+    "SECRET_KEY" : "wizleywizleywizleywizleywizleywizleywizleywizleysw"
+}
+```
+
+위와 같이 secret.json으로 SECRET_KEY의 값을 가지고 있는 임의의 파일을 생성하였다. 이제 블로그를 참조해서 SECRET_KEY의 값을 가져오는 코드를 추가하면 된다.
+
+```python
+
+import os, json
+from django.core.exceptions import ImproperlyConfigured
+
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# My custom secretKey is in secret.json file
+secret_file = os.path.join(BASE_DIR, 'eatenAway/secret.json')
+
+with open(secret_file) as f:
+    secret = json.loads(f.read())
+
+def get_secretKey(setting, secret=secret):
+    try:
+        return secret[setting]
+    except KeyError:
+        error_msg = "Set the {} environment variable".format(setting)
+        raise ImproperlyConfigured(error_msg)
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = get_secretKey("SECRET_KEY")
+```
+
+자 이제 SECRET_KEY를 custom하게 가져오게 되었다. github에 공유할 때 .gitignore를 통해 secret.json 파일을 제외해주면 된다.
+
