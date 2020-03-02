@@ -578,3 +578,227 @@ SECRET_KEY = get_secretKey("SECRET_KEY")
 
 자 이제 SECRET_KEY를 custom하게 가져오게 되었다. github에 공유할 때 .gitignore를 통해 secret.json 파일을 제외해주면 된다.
 
+## user app 개발 
+
+벌써 3월이다. 저번에 만들어만 뒀던 user 어플리케이션을 구현해보도록 하자. user 앱에서 구현하고자 하는 기능은 크게 다음과 같다.
+
+1. 회원가입/회원탈퇴
+2. 로그인/로그아웃
+3. 아이디/패스워드 찾기 및 변경
+4. 인증기능(이메일)
+
+PHP로 구현했었던 게시판에 들어갔었던 기능의 대부분이 해당 범주에 있다. 역시나 django에서도 MVT에 기반하여 개발후에 HelloWorld를 찍는 부분부터 진행을 하도록 하겠다.
+
+### HelloWorld 출력 
+
+```python
+from django.http import HttpResponse
+
+def index(request):
+    return HttpResponse("HelloWorld from user!")
+```
+
+제일 먼저 views.py 부분에 다음과 같이 작성을 한다. 이 index를 호출하기 위해서는 URL 정보를 등록하여야 한다.
+
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('/', views.index, name='index'),
+]
+```
+
+위와같이 urlpatterns 정보를 user/urls.py를 생성하여 적어준다. 해당 url 패턴을 타기 위해서는 project의 메인 프로젝트의 urls.py에 해당 정보를 추가해주어야 한다.
+
+```python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('user/', include('user.urls')),
+]
+```
+
+위와 같이 eatenAway/urls.py에 user를 path로 추가해주었다. 이렇게 되면 main App에서 localhost:8000/user/ 라는 url이 입력이 되면 urlpatterns에서 추가된 부분의 루틴에 따라 user/urls.py 내부의 urlpatterns을 확인하게 된다. 그리고 user/urls.py의 정보에 의하여 / 루트에 대하여 views.py의 index 함수를 호출해준다. 만약 path의 / 부분이 abcd/였다면 localhost:8000/user/abcd/ 를 입력하면 index라는 python 코드가 해석되는 것이다. 이런 URL 디자인 패턴을 '우아한 URL 패턴'이라고 한다. 이를 통해 아래와 같이 첫 페이지를 확인할 수가 있다!
+
+![helloworld](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/helloworld.png)
+
+### User, Account db 설계 
+
+```python
+# Database
+# https://docs.djangoproject.com/en/3.0/ref/settings/#databases
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+}
+```
+
+settings.py 부분을 보면 위와같이 database 항목이 있다. 그리고 django는 default 옵션으로 sqlite3를 사용한다. 만약 mysql과 같이 다른 db사용을 위해서는 해당 부분을 변경해주어야 한다. 그리고 settings.py의 하위 항목부분에 시간설정 부분이 존재한다.
+
+```python
+LANGUAGE_CODE = 'en-us'
+
+TIME_ZONE = 'UTC'
+
+USE_I18N = True
+
+USE_L10N = True
+
+USE_TZ = True
+```
+
+한국 시간을 사용하기 위해서 아래와 같이 변경해주었다.
+
+```python
+LANGUAGE_CODE = 'en-us'
+
+TIME_ZONE = 'Asia/Seoul'
+```
+
+자 이번에는 models.py를 수정하여 database와 관련된 필드에 대한 구성을 해보도록 하겠다. 제일 먼저 해야될 것이 사용자에 대한 db정보를 생성하는 것이다. 그렇다면 user를 관리하기 위해서는 어떤 값들이 필요할까를 고민해볼 차례이다. 생각나는 것들을 적어보면 다음과 같다.
+
+1) 이름
+2) 생일
+3) 성별
+4) 가입 날짜
+5) id
+6) password
+7) email address
+8) user_no(primary key)
+9) 계정 상태(active 여부)
+
+자 이제 위의 정보를 토대로 사용자로부터 입력을 받을 정보를 추려보면 다음과 같다.
+
+개인정보 
+1) 이름
+2) 생일
+3) 성별
+
+계정정보 
+1) id
+2) password
+3) email address
+
+위의 정보들을 종합하여 내가 처음으로 설계한 models.py의 모습은 다음과 같다.
+
+```python
+from django.db import models
+from django import forms
+
+class User(models.Model):
+    name = models.CharField(max_length=20)
+    birth = models.DateField()
+    area = models.CharField(max_length=10)
+    sex_selection = (
+        ('M', '남성'),
+        ('W', '여성'),
+    )
+    sex = models.CharField(max_length=1, choices=sex_selection)
+
+class Account(models.Model):
+    user_info = models.ForeignKey(
+        User,
+        on_delete = models.CASCADE,
+        verbose_name="개인정보"
+    )
+    account_no = models.AutoField(primary_key=True)
+    id = models.CharField(max_length=10, verbose_name='ID')
+    password = forms.CharField(max_length=16, widget=forms.PasswordInput)
+    email = models.EmailField(max_length=32, verbose_name='이메일')
+    created_date = models.DateTimeField(auto_now_add=True, verbose_name="가입날짜")
+    comment = models.CharField(max_length=20, verbose_name="코멘트")
+    account_status_selection = (
+        ('O', '정상'),
+        ('X', '삭제'),
+        ('B', '정지'),
+    )
+    status = models.CharField(max_length=1, choices=account_status_selection)
+```
+
+자 이제 확인을 위해서 settings.py에 user app을 추가하도록 한다.
+
+```python
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'user',
+]
+```
+
+자 이제 makemigrations를 사용하여 db를 생성한다.
+
+```console
+root@50a2c9a1cf4b:/code/eatenAway# python manage.py makemigrations user
+Migrations for 'user':
+  user/migrations/0001_initial.py
+    - Create model User
+    - Create model Account
+```
+
+models.py에서 적용한 변경사항이나 추가된 혹은 삭제된 사항들을 감지하여 파일로 생성하는 단계가 makemigrations가 되는 것이다. 그리고 migrate의 경우 적용되지 않는 migrations 값들을 적용시키는 역할을 하기 때문에 해당 명령어도 아래와 같이 실행시키면 적용이 된다.
+
+```console
+root@50a2c9a1cf4b:/code/eatenAway# python manage.py migrate
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, sessions, user
+Running migrations:
+  Applying user.0001_initial... OK
+```
+
+자 이제 admin 페이지에 두 model을 추가해보자. 이를 위해서는 user/admin.py에 아래와 같이 정보를 추가해주어야 된다.
+
+```python
+from django.contrib import admin
+from .models import User, Account
+
+admin.site.register(User)
+admin.site.register(Account)
+```
+
+이제 localhost:8000/admin/ 에 superuser로 접속하면 정보가 추가된 것을 확인할 수 있다!
+
+![admin_add](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/admin_add.png)
+
+이제 제대로 추가가 되었는지 확인을 할겸 렌더링해보도록 하겠다. 이 과정에서 manage.py shell을 통해 정보를 추가할 수도 있는데 나의 경우 admin 페이지를 통해 추가하였다.
+
+```python
+urlpatterns = [
+    path('', views.index, name='index'),
+    path('user/', views.getuser, name='getuser'),
+]
+```
+
+가장 먼저 user/라는 sub url을 user/urls.py에 추가하였다. 이제 /user/user로 접속하면 뿌려줄 값을 views.py 부분에 추가하면 된다.
+
+```python
+from django.http import HttpResponse
+from .models import *
+from itertools import chain
+
+def index(request):
+    return HttpResponse("HelloWorld from user!")
+
+def getuser(request):
+    account_info = Account.objects.order_by('account_no')
+    user_info = User.objects.filter(id=account_info[0].user_info_id)
+    result = chain(account_info.values(), user_info.values())
+    return HttpResponse(result)
+```
+
+여러 삽질을 통해 위와 같은 코드를 작성하였다. QuerySet으로 결과값을 받아오는데 해당 값에 대한 filter 및 order_by등을 통한 가공이 가능하다. 다른 모델에서 나온 두 쿼리셋을 어떻게 하면 합칠까에 대해서 삽질을 많이했는데 itertools를 사용하여 두 값을 체인하면 아래와 같은 결과를 가져올 수 있다.
+
+![queryset](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/queryset.png)
+
+
+
+
