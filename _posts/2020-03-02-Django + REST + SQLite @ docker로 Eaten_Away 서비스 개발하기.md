@@ -663,27 +663,27 @@ TIME_ZONE = 'Asia/Seoul'
 
 자 이번에는 models.py를 수정하여 database와 관련된 필드에 대한 구성을 해보도록 하겠다. 제일 먼저 해야될 것이 사용자에 대한 db정보를 생성하는 것이다. 그렇다면 user를 관리하기 위해서는 어떤 값들이 필요할까를 고민해볼 차례이다. 생각나는 것들을 적어보면 다음과 같다.
 
-1) 이름
-2) 생일
-3) 성별
-4) 가입 날짜
-5) id
-6) password
-7) email address
-8) user_no(primary key)
-9) 계정 상태(active 여부)
+1. 이름
+2. 생일
+3. 성별
+4. 가입 날짜
+5. id
+6. password
+7. email address
+8. user_no(primary key)
+9. 계정 상태(active 여부)
 
 자 이제 위의 정보를 토대로 사용자로부터 입력을 받을 정보를 추려보면 다음과 같다.
 
 개인정보 
-1) 이름
-2) 생일
-3) 성별
+1. 이름
+2. 생일
+3. 성별
 
 계정정보 
-1) id
-2) password
-3) email address
+1. id
+2. password
+3. email address
 
 위의 정보들을 종합하여 내가 처음으로 설계한 models.py의 모습은 다음과 같다.
 
@@ -799,6 +799,50 @@ def getuser(request):
 
 ![queryset](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/queryset.png)
 
+여러 사용법은 아래의 링크를 참고하면 될듯하다.
 
+[django querySet](https://ssungkang.tistory.com/entry/Django-데이터베이스-조회-queryset)
+
+이제 templates에 연동을 해보자. 이를 위해 user 하위에 templates/index.html을 생성하였고 아래와 같이 작성하였다.
+
+```html
+{% if user_info %}
+    <ul>
+        {% for user in user_info %}
+        <li>{{user.id}}</li>
+        <li>{{user.email}}</li>
+        <li>{{user.comment}}</li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No User.</p>
+{% endif %}
+```
+
+그리고 해당 부분을 views.py와 연동하는 작업을 위해 아래와 같이 수정하였다.
+
+```python
+from django.http import HttpResponse
+from django.shortcuts import render
+from .models import *
+from itertools import chain
+
+def index(request):
+    return HttpResponse("HelloWorld from user!")
+
+def getuser(request):
+    account_info = Account.objects.order_by('account_no')
+    user_info = User.objects.filter(id=account_info[0].user_info_id)
+    return render(request, 'index.html',{'user_info' : account_info})
+```
+
+render가 index.html에 user_info라는 객체의 정보로 account_info를 넘겨주게 되면 해당 부분을 html이 뿌려주는 것이다. 결과를 확인해보면 아래와 같이 내용이 출력되는 것을 확인할 수 있다. 
+
+![template_user](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/template_user.png)
+
+이제 간단한 MVT 모델에 대한 학습을 끝냈다. 
+
+
+    
 
 
