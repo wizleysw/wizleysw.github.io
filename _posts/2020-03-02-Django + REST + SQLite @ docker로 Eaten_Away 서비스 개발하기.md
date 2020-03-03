@@ -953,7 +953,7 @@ STATICFILES_DIRS = (
 )
 ```
 
-그 후 user/static 아래에 파일들을 옮긴 후 아래와 같이 html 템플릿에 load static 및 {% static %}으로 경로를 바꿔주면 된다.
+그 후 user/static 아래에 파일들을 옮긴 후 아래와 같이 html 템플릿에 load static 및 static을 붙힌 경로로 바꿔주면 된다.
 
 ```html
 <!doctype html>
