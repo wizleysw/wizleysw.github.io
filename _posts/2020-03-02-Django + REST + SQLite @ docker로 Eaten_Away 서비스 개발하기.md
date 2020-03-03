@@ -969,7 +969,7 @@ STATICFILES_DIRS = (
 
   <!-- <link rel="manifest" href="site.webmanifest"> -->
   <link rel="shortcut icon" type="image/x-icon" href="{% static 'img/favicon.png' %}">
-{% \endraw %}
+{% endraw %}
 ```
 
 이 시점에서 느낀건데 HTML을 이쁘게 만들면서 하기에는 프론트를 1도 모르기 때문에 거의 불가능에 가깝다고 보았다. 그래서 볼만한 수준의 정도만 만들고 넘어가는 방식으로 진행을 해야할 것 같다. (html에 대한 부분의 코드는 생략한다.)
