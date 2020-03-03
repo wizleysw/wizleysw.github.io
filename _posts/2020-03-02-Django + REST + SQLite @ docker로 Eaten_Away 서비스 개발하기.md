@@ -842,7 +842,198 @@ render가 index.html에 user_info라는 객체의 정보로 account_info를 넘�
 
 이제 간단한 MVT 모델에 대한 학습을 끝냈다. 
 
+지금 시점에서 막상 Models을 ForeignKey로 설계를 하니 초보자인 나에게 사용하기가 여간 불편한게 아니었다. 그래서 해당 부분을 하나로 통합하기로 하였다. 그래서 다음과 같이 다시 구조를 변경하였다.
 
-    
+```python
+from django.db import models
+from django import forms
+
+class Account(models.Model):
+    account_no = models.AutoField(primary_key=True)
+
+    name = models.CharField(max_length=20, verbose_name='이름', default='Chihiro')
+    birth = models.DateField(null=True)
+    area = models.CharField(max_length=10, verbose_name='지역', default='Seoul')
+    sex_selection = (
+        ('M', '남성'),
+        ('W', '여성'),
+    )
+    sex = models.CharField(max_length=1, choices=sex_selection, default='W')
+
+    id = models.CharField(max_length=10, verbose_name='ID')
+    password = forms.CharField(max_length=16, widget=forms.PasswordInput)
+    email = models.EmailField(max_length=32, verbose_name='이메일')
+    created_date = models.DateTimeField(auto_now_add=True, verbose_name="가입날짜")
+    comment = models.CharField(max_length=20, verbose_name="코멘트")
+
+    account_status_selection = (
+        ('O', '정상'),
+        ('X', '삭제'),
+        ('B', '정지'),
+    )
+    status = models.CharField(max_length=1, choices=account_status_selection)
+```
+
+이제 위와 같이 DB를 수정하게 되면 기존의 ForeignField 값인 name, birth, area 그리고 sex에 대한 설정값이 사라지기 때문에 그게 대한 default를 세팅해주어야 된다. 
+
+```console
+root@50a2c9a1cf4b:/code/eatenAway# python manage.py makemigrations
+You are trying to add a non-nullable field 'sex' to account without a default; we can't do that (the database needs something to populate existing rows).
+Please select a fix:
+ 1) Provide a one-off default now (will be set on all existing rows with a null value for this column)
+ 2) Quit, and let me add a default in models.py
+Select an option: 2
+```
+
+만약 default 또는 null=true가 없을 경우에 위와 같은 문제가 발생한다. 이제 수정한 뒤에 아까와 같이 명령을 실행해주면 된다.
+
+```console
+root@50a2c9a1cf4b:/code/eatenAway# python manage.py makemigrations
+Migrations for 'user':
+  user/migrations/0002_auto_20200303_1905.py
+    - Remove field user_info from account
+    - Add field area to account
+    - Add field birth to account
+    - Add field name to account
+    - Add field sex to account
+    - Delete model User
+root@50a2c9a1cf4b:/code/eatenAway# python manage.py migrate
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, sessions, user
+Running migrations:
+  Applying user.0002_auto_20200303_1905... OK
+  ```
+
+Default 옵션으로 설정한 값들은 생각을 해보니 딱히 없앨 필요가 없을 것 같아서 필요해지기 전까지는 저대로 두기로 하였다. 이제 모델을 작성했으니 templates을 연결하여 회원가입을 짤 차례이다.
+
+### 템플릿 
+
+동아리 후배로부터 HTML 템플릿을 추천받았기에 해당 템플릿을 사용하도록 하겠다. 템플릿을 사용할 때는 꼭!! 라이센스를 확인해야된다. 
+
+[story](https://html5up.net/story)
+
+사실은 밑에 있는 템플릿을 사용하려다가 도저히 프론트쪽이 이해가 안되서 바꿨다 ㅎㅎ..
+
+[burger template](https://colorlib.com/wp/template/burger/)
+
+다행히 해당 템플릿의 라이센스는  CC BY 3.0 였다. footer만 남기고는 마음껏 사용해도 될 것 같다.
+
+[CC 3.0](https://creativecommons.org/licenses/by/3.0/deed.ko)
+
+### 회원가입 페이지 만들기
+
+admin 페이지를 통해 Account 정보를 손쉽게 확인이 가능하다. 이 점을 활용하여 회원가입 페이지를 작성해보도록 하겠다.
+
+```python
+urlpatterns = [
+    path('', views.index, name='index'),
+    path('user/', views.getuser, name='getuser'),
+    path('signup/', views.signup, name='signup'),
+]
+```
+
+이제 URL을 수정한 뒤 signup에 해당하는 골격을 짠다.
+
+```python
+def getuser(request):
+    return render(request, 'signup.html', {})
+```
+
+이제 templates을 signup.html로 넣어줬는데 CSS가 정상적으로 로드되지 않았다.
+
+[django css 설정](https://m.blog.naver.com/shino1025/221320924962)
+
+django에서는 static에 css/js등의 값을 넣어서 관리한다고 하는데 이를 위해서 위의 링크를 따라 작성하였다. 간단하게 요약해놓자면 settings.py에 경로에 대한 정보를 아래와 같이 입력한다.
+
+```python
+
+STATIC_URL = '/static/'
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, 'static'),
+)
+```
+
+그 후 user/static 아래에 파일들을 옮긴 후 아래와 같이 html 템플릿에 load static 및 {% static %}으로 경로를 바꿔주면 된다.
+
+```html
+<!doctype html>
+{% load static %}
+<html class="no-js" lang="zxx">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>Burger</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- <link rel="manifest" href="site.webmanifest"> -->
+  <link rel="shortcut icon" type="image/x-icon" href="{% static 'img/favicon.png' %}">
+```
+
+이 시점에서 느낀건데 HTML을 이쁘게 만들면서 하기에는 프론트를 1도 모르기 때문에 거의 불가능에 가깝다고 보았다. 그래서 볼만한 수준의 정도만 만들고 넘어가는 방식으로 진행을 해야할 것 같다. (html에 대한 부분의 코드는 생략한다.)
+
+### recaptcha
+
+로봇이 아닙니다를 위해서 recaptcha를 추가해주기 위해서 아래의 링크를 참조하였다.
+
+[recaptcha 등록절차](https://wikidocs.net/10378)
+
+여기서 submit action이 수행시에 캡차 여부를 확인하기 위한 스크립트를 추가로 작성하였다.
+
+```javascript
+  var check = function() {
+
+    if (document.getElementById('password').value == document.getElementById('password2').value) {
+      document.getElementById('message').style.color = 'green';
+      document.getElementById('message').innerHTML = '패스워드가 일치합니다.';
+    } else {
+    document.getElementById('message').style.color = 'red';
+    document.getElementById('message').innerHTML = '패스워드가 올바르지 않습니다.';
+    }
+  }
+  function checkRecap(){
+    var v = grecaptcha.getResponse();
+    if(v.length==0){
+      alert('캡차를 확인하세요');
+      return false;
+    }
+    else{
+      return true;
+    }
+  }
+```
+
+위의 코드의 checkRecap은 아래의 사이트에서 가져왔다.
+
+[recaptcha 스크립트](https://galid1.tistory.com/337)
+
+여러 사이트에서 invisible의 형식으로 button에 캡차를 넣기도 하던데 실습을 하는데 잘 안되서 지금처럼 checkRecap을 onsubmit에서 거치도록 구현하였다.
+
+이 시점에서 회원가입 폼을 받는 페이지에서의 HTML의 구현은 다 되었고 아이디와 이메일 사용여부를 확인해주는 부분을 구현해야 된다.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
