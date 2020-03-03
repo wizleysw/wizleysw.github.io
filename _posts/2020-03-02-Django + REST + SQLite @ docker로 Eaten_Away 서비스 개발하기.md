@@ -946,7 +946,6 @@ def getuser(request):
 django에서는 static에 css/js등의 값을 넣어서 관리한다고 하는데 이를 위해서 위의 링크를 따라 작성하였다. 간단하게 요약해놓자면 settings.py에 경로에 대한 정보를 아래와 같이 입력한다.
 
 ```python
-
 STATIC_URL = '/static/'
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static'),
@@ -956,6 +955,7 @@ STATICFILES_DIRS = (
 그 후 user/static 아래에 파일들을 옮긴 후 아래와 같이 html 템플릿에 load static 및 static을 붙힌 경로로 바꿔주면 된다.
 
 ```html
+{% raw %}
 <!doctype html>
 {% load static %}
 <html class="no-js" lang="zxx">
