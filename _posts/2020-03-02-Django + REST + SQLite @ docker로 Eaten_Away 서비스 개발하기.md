@@ -1013,24 +1013,252 @@ STATICFILES_DIRS = (
 
 이 시점에서 회원가입 폼을 받는 페이지에서의 HTML의 구현은 다 되었고 아이디와 이메일 사용여부를 확인해주는 부분을 구현해야 된다.
 
+### rest framework 도입
+
+회원가입 부분에서 아이디/이메일 중복 체크 및 회원가입 버튼을 클릭한 경우에 REST api로 처리가 되면 어떨가라는 고민을 하게 되었고 이 부분에 도입을 해보기로 하였다. 이를 위해서 django-rest-auth를 추가적으로 설치를 해주었다.
+
+```console
+root@b099b068dc26:/code# pip install django-rest-auth django-rest-authtoken
+root@b099b068dc26:/code# pip list
+Package                 Version
+----------------------- -------
+asgiref                 3.2.3
+attrs                   19.3.0
+coverage                5.0.3
+Django                  3.0.3
+django-cors-headers     3.2.1
+django-rest-auth        0.9.5
+django-rest-authtoken   1.2.4
+djangorestframework     3.11.0
+djangorestframework-jwt 1.11.0
+more-itertools          8.2.0
+packaging               20.1
+pip                     20.0.2
+pluggy                  0.13.1
+py                      1.8.1
+PyJWT                   1.7.1
+pyparsing               2.4.6
+pytest                  5.3.5
+pytest-cov              2.8.1
+pytz                    2019.3
+setuptools              45.1.0
+six                     1.14.0
+sqlparse                0.3.0
+wcwidth                 0.1.8
+wheel                   0.34.2
+```
+
+이제 settings.py 부분에서 INSTALLED_APP에 rest와 관련된 모듈들을 추가해주어야 된다.
+
+```python
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'rest_auth',
+    'user',
+]
+```
+
+지금부터는 아래의 블로그의 내용을 보면서 공부를 진행하였다.
+
+[DRF A-Z](https://inma.tistory.com/85?category=984128)
+
+이번에는 user app아래에 api/serializers.py를 생성한다.
+
+```python
+from rest_framework import serializers
+from ..models import Account
 
 
+class AccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Account
+        fields = '__all__'
+        extra_kwargs = {"password": {"write_only": True}}
+```
 
+다음과 같이 ModelSerializer로 AccountSerializer를 생성한다. password같은 경우 숨겨야 하는 값이기 때문에 extra_kwargs로 write_only로 설정해준다.
 
+```python
+from django.http import HttpResponse
+from django.shortcuts import render
+from .models import *
+from rest_framework import viewsets
+from .api.serializers import AccountSerializer
 
+class AccountViewSet(viewsets.ModelViewSet):
+    queryset = Account.objects.all()
+    serializer_class = AccountSerializer
 
+```
 
+views.py 부분에 다음과 같이 AccountViewSet을 추가해준다.
 
+```python
+from django.conf.urls import url
+from django.urls import path, include
+from rest_framework import routers
+from . import views
 
+router = routers.DefaultRouter()
+router.register('account', views.AccountViewSet)
 
+urlpatterns = [
+    path('user/', views.getuser, name='getuser'),
+    path('signup/', views.signup, name='signup'),
+    path('', include(router.urls))
+]
+```
 
+그리고 urls.py 부분에 router를 설정해줌으로써 /user/account로 라우팅을 해주게 된다. 
 
+![apiroot](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/apiroot.png)
 
+이 시점에서 localhost:8000/user/로 접속을 하면 위와 같은 창을 확인할 수가 있다. 
 
+여기서 조금 더하여 id를 검사하여 해당 아이디 값을 찾아주는 query_param은 다음의 방식으로 추가할 수 있다.
 
+```python
 
+class AccountViewSet(viewsets.ModelViewSet):
+    queryset = Account.objects.all()
+    serializer_class = AccountSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
 
+        search = self.request.query_params.get('id', '')
+        if search:
+            qs = qs.filter(id=search)
+        return qs
+```
+
+위와 같이 작성하면 localhost:8000/user/account/?id=wizley와 같이 찾아보면 그에 따른 결과값을 가져올 수 있다. 
+
+### 중복 검사
+
+이제 이 부분을 아주 긴 삽질의 시간을 지나 다음과 같이 만들었다. rest api를 활용하여 /user/api/check/username or email 의 형식으로 값을 조회하여 사용가능한 경우에 사용됨을 사용불가능한 경우에는 불가능함을 알려주는 코드를 작성하였다. 이 과정에서 id를 username으로 변경하여 migration을 진행하였다.
+
+urls.py는 다음과 같이 수정하였다.
+
+```python
+urlpatterns = [
+    path('signup/', views.signup, name='signup'),
+    path('api/', views.AccountList.as_view()),
+    path('api/check/username/<str:username>/', views.is_username_exist.as_view()),
+    path('api/check/email/<str:email>/', views.is_email_exist.as_view())
+]
+
+```
+
+그 뒤 serializer 부분에 검증코드를 추가하였다.
+
+```python
+class AccountSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField()
+
+    class Meta:
+        model = Account
+        fields = '__all__'
+        extra_kwargs = {"password": {"write_only": True}}
+
+    def validate_username(self, value):
+        if Account.objects.filter(username=value).exists():
+            raise serializers.ValidationError("이미 사용중인 아이디입니다.")
+        return "사용가능한 아이디입니다."
+
+    def validate_email(self, value):
+        if Account.objects.filter(email=value).exists():
+            raise serializers.ValidationError("해당 이메일은 이미 사용중입니다.")
+        return "사용가능한 이메일입니다."
+
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("패스워드는 최소 %s자 이상이어야 합니다." % 8)
+        return value
+
+```
+
+처리를 위한 코드를 views.py에 추가하였다.
+
+```python
+"""
+id 중복 검사 
+/user/api/check/id/<str:id>/
+"""
+class is_username_exist(APIView):
+    def get_object(self, username):
+        try:
+            return Account.objects.get(username=username)
+        except Account.DoesNotExist:
+            return "OK"
+
+    def get(self, request, username):
+        ac = self.get_object(username)
+        if ac == "OK":
+            return Response("사용가능한 아이디입니다.")
+        return AccountSerializer(ac).validate_username(username)
+
+"""
+email 중복 검사 
+/user/api/check/username/<str:username>/
+"""
+class is_email_exist(APIView):
+    def get_object(self, email):
+        try:
+            return Account.objects.get(email=email)
+        except Account.DoesNotExist:
+            return "OK"
+
+    def get(self, request, email):
+        ac = self.get_object(email)
+        if ac == "OK":
+            return Response("사용가능한 이메일입니다.")
+        return AccountSerializer(ac).validate_email(email)
+        ```
+
+그리고 해당 부분을 handle하는 확인 코드를 XMLHttpRequest를 활용하여 작성하였다.
+
+```javascript
+  function checkUsername(){
+    id = document.getElementById('username').value;
+    if(id.length<1){
+      alert('아이디를 입력하세요.');
+    }
+    else{
+      xhr = new XMLHttpRequest();
+      link = 'http://localhost:8000/user/api/check/username/' + id;
+      xhr.open('GET', link, false);
+      xhr.send();
+      var content = xhr.responseText;
+      alert(content);
+    }
+  }
+
+  function checkEmail(){
+    email = document.getElementById('email').value;
+    var regExp = /^[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*.[a-zA-Z]{2,3}$/i;
+      if (regExp.test(email)){
+      xhr = new XMLHttpRequest();
+      link = 'http://localhost:8000/user/api/check/email/' + email;
+      xhr.open('GET', link, false);
+      xhr.send();
+      var content = xhr.responseText;
+      alert(content);
+    }
+    else{
+      alert('잘못된 이메일 형식입니다');
+    };
+  }
+```
+
+여기까지 작성이 끝나면 아이디 및 이메일 중복검사 기능이 수행된다. 후.. 모든걸 처음 부딪히다 보니까 만만하지가 않다. 이제 회원가입을 처리하는 부분을 구현해야 된다.
 
 
 
