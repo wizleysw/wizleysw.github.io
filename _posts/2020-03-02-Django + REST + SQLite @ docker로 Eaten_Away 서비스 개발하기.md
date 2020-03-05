@@ -1287,19 +1287,15 @@ class AccountSerializer(serializers.ModelSerializer):
 
     def validate_username(self, value):
         if Account.objects.filter(username=value).exists():
-            raise serializers.ValidationError("이미 사용중인 아이디입니다.")
-        return "사용가능한 아이디입니다."
+            return False
+        else:
+            return True
 
-    def validate_email(self, value):
+    def validate_email(selfself, value):
         if Account.objects.filter(email=value).exists():
-            raise serializers.ValidationError("해당 이메일은 이미 사용중입니다.")
-        return "사용가능한 이메일입니다."
-
-    def validate_password(self, value):
-        if len(value) < 8:
-            raise serializers.ValidationError("패스워드는 최소 %s자 이상이어야 합니다." % 8)
-        return value
-
+            return False
+        else:
+            return True
 ```
 
 각각에 대해서 존재하는지에 대한 여부를 검사하는 코드를 시리얼라이저 내부에 넣어두었다. 해당 기능들은 form 데이터를 검증하여 유저를 생성하는 과정에서도 사용되기 때문에 해당 위치에 분리해두었다.
@@ -1349,14 +1345,22 @@ class verifyExistence(APIView):
         ac = self.getObject_with_username(username)
         if ac == "OK":
             return Response("사용가능한 아이디입니다.")
-        return AccountSerializer(ac).validate_username(username)
+        else:
+            if AccountSerializer(ac).validate_username(username):
+                return Response("사용가능한 아이디입니다.")
+            else:
+                return Http404
+
 
     def post(self, request):
         email = request.data['email']
         ac = self.getObject_with_email(email)
         if ac == "OK":
             return Response("사용가능한 이메일입니다.")
-        return AccountSerializer(ac).validate_email(email)
+        if AccountSerializer(ac).validate_email(email):
+            return Response("사용가능한 이메입니다.")
+        else:
+            return Http404
 
 ```
 
@@ -1396,6 +1400,155 @@ function checkEmail(){
 
 마지막으로 javascript코드를 static/js/signup.js로 분리하는 것으로 id/email 검증에 대한 구현이 마무리되었다. 
 
+
+### 회원가입 구현
+
+회원가입의 경우에도 REST로 처리해야되는데 내가 그리는 로직상 이동하는 페이지와 API 서버는 다르기 때문에 ajax로 POST를 쏘는 방식으로 구현을 진행하였다.
+
+```javascript
+function lastCheck(){
+  id = document.getElementById('username').value;
+  if(id.length<1){
+    alert('아이디를 다시 확인해주세요.');
+    return false;
+  }
+
+  if(document.getElementById('password').value != document.getElementById('password2').value){
+    alert('패스워드를 다시 확인해주세요.');
+    return false;
+  }
+
+  if(document.getElementById('password').value.length < 8){
+    alert('패스워드 최소길이는 8글자입니다.');
+    return false;
+  }
+
+  email = document.getElementById('email').value;
+  if(!(regExp.test(email))){
+    alert('이메일을 다시 확인해주세요.');
+    return false;
+  }
+
+  if(!checkRecap()){
+    return false;
+  }
+
+    function tryRes(){
+      var queryString = $("form[name=registerForm]").serialize();
+
+        $.ajax({
+            type: 'POST',
+            url: 'http://localhost:8000/api/accounts/',
+            data : queryString,
+            dataType : 'json',
+            async: false,
+            error: function(xhr, status, error){
+                alert('정보를 다시 확인해주세요.');
+                grecaptcha.reset();
+                flag = false;
+            },
+            success: function(xhr){
+                alert('회원가입 신청이 완료되었습니다.');
+                flag = true;
+            },
+        });
+
+        return flag;
+       }
+
+       var res = tryRes();
+       return res;
+}
+```
+
+폼이 전송되는 obSubmit 시점에서 해당 함수가 호출이되는데 javascript단에서 한번 form 데이터를 검증한다. 그 후 tryRes라는 함수가 REST api로 POST를 쏘게 되는데 그 값의 여부에 따라서 flag값이 설정이 된다. 처음에는 함수로 진행하여 res로 값을 빼지 않았을 경우에 ajax의 response가 돌아오기 까지의 시간이 느리기 때문에 아래의 flow가 실행되는 문제가 있어서 res에 남아두고 해당 값을 return 하는 방식을 사용하였다. 
+
+해당 REST를 컨트롤 하기 위해서 urls.py는 다음과 같이 추가되었다.
+
+```python
+urlpatterns = [
+    path('accounts/', views.AccountList.as_view()),
+    path('accounts/verify/', views.verifyExistence.as_view()),
+    path('accounts/verify/<str:username>/', views.verifyExistence.as_view()),
+]
+
+```
+
+AccountList라는 Class는 유저의 계정을 생성/조회/삭제/최신화하는 역할을 위해서 개설되었고 지금은 post에 대한 값만 처리를 진행한다.
+
+```python
+class AccountList(APIView):
+    def get(self, request):
+        return Response('HelloWorld')
+
+    def post(self, request):
+        form_data = AccountForm(request.data)
+
+        if not checkRecaptcha(request.data['g-recaptcha-response']):
+            return Response("fail.", status=HTTP_400_BAD_REQUEST)
+
+        if form_data.is_valid():
+            cl = verifyExistence();
+            ac = verifyExistence.getObject_with_username(cl, form_data.cleaned_data['username'])
+            if not AccountSerializer(ac).validate_username(form_data.cleaned_data['username']):
+                return Response('fail.', status=HTTP_400_BAD_REQUEST)
+
+            ac = verifyExistence.getObject_with_email(cl, form_data.cleaned_data['email'])
+            if not AccountSerializer(ac).validate_email(form_data.cleaned_data['email']):
+                return Response('fail.', status=HTTP_400_BAD_REQUEST)
+
+            new_account = form_data.save(commit=False)
+            new_account.set_password(form_data.cleaned_data['password'])
+            new_account.save()
+            return Response('success.', status=HTTP_201_CREATED)
+
+        else:
+            return Response('fail.', status=HTTP_400_BAD_REQUEST)
+```
+
+리턴값은 2가지로 나뉜다. 실패했을 경우 400_BAD_REQUEST를 리턴하고 성공할 경우에만 201_CREATED를 리턴해준다. 그리고 그 과정에서 form_data와 비교하여 값이 제대로 POST 데이터로 들어왔는지 검증을 해준 뒤, id/email 검증을 수행한다. 그 후 new_account로 form_data를 넘겨준뒤 save를 진행한다. 이 과정에서 평문으로 저장되는 password를 해쉬화 하기 위해서 set_password 패스워드를 사용하고 싶었기에 user/models.py를 다음과 같이 변경하였다.
+
+```python
+from django.db import models
+from django import forms
+from django.contrib.auth.models import AbstractBaseUser
+
+class Account(AbstractBaseUser):
+    account_no = models.AutoField(primary_key=True)
+
+    name = models.CharField(max_length=20, verbose_name='이름', default='Chihiro')
+    birth = models.DateField(null=True)
+    area = models.CharField(max_length=10, verbose_name='지역', default='Seoul')
+    sex_selection = (
+        ('M', '남성'),
+        ('W', '여성'),
+    )
+    sex = models.CharField(max_length=1, choices=sex_selection, default='W')
+
+    username = models.CharField(max_length=10, verbose_name='아이디')
+    password = models.CharField(max_length=16, verbose_name='패스워드')
+    email = models.EmailField(max_length=32, verbose_name='이메일')
+    created_date = models.DateTimeField(auto_now_add=True, verbose_name="가입날짜")
+    comment = models.CharField(max_length=20, verbose_name="코멘트", blank=True)
+    profile = models.ImageField(upload_to="user_profile/profile_picture", blank=True)
+
+    account_status_selection = (
+        ('O', '정상'),
+        ('X', '삭제'),
+        ('B', '정지'),
+        ('W', '검증'),
+    )
+    status = models.CharField(max_length=1, choices=account_status_selection, default="W")
+
+    USERNAME_FIELD = 'username'
+
+    def __str__(self):
+        return self.username
+```
+
+AbstractBaseUser를 상속받는 방식으로 set_password와 같이 기본 메소드를 상속받는게 가능하다. 그리고 이 경우에 USERNAME_FIELD를 명시를 해줘야 한다.
+
+위와 같이 구현을 하면 회원가입에 대한 처리가 /api/account URL을 통해 POST로 처리가 된다. 
 
 
 
