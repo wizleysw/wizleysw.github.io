@@ -1141,7 +1141,7 @@ class AccountViewSet(viewsets.ModelViewSet):
 
 위와 같이 작성하면 localhost:8000/user/account/?id=wizley와 같이 찾아보면 그에 따른 결과값을 가져올 수 있다. 
 
-### 중복 검사
+### ID / email 중복 검사
 
 이제 이 부분을 아주 긴 삽질의 시간을 지나 다음과 같이 만들었다. rest api를 활용하여 /user/api/check/username or email 의 형식으로 값을 조회하여 사용가능한 경우에 사용됨을 사용불가능한 경우에는 불가능함을 알려주는 코드를 작성하였다. 이 과정에서 id를 username으로 변경하여 migration을 진행하였다.
 
@@ -1258,7 +1258,166 @@ class is_email_exist(APIView):
   }
 ```
 
-여기까지 작성이 끝나면 아이디 및 이메일 중복검사 기능이 수행된다. 후.. 모든걸 처음 부딪히다 보니까 만만하지가 않다. 이제 회원가입을 처리하는 부분을 구현해야 된다.
+여기까지 작성이 끝나면 아이디 및 이메일 중복검사 기능이 수행된다. 하지만 형식이 마음에 들지 않아서 약간의 수정을 하도록 하겠다.
+
+먼저 api라는 앱을 추가하여 해당 url과 처리를 관리하는 부분을 user로부터 분리하였다. 그 후 api로 시작하는 경로에 다음과 같이 url pattern을 추가하였다.(정확히 말하면 user -> api로 수정하면서 이전하였다.)
+
+```python
+urlpatterns = [
+    path('accounts/', views.AccountList.as_view()),
+    path('accounts/verify/', views.verifyExistence.as_view()),
+    path('accounts/verify/<str:username>/', views.verifyExistence.as_view()),
+]
+```
+
+verify는 세분화적으로 2개로 나뉘는데 verify그 자체는 GET 메소드를 받아서 id의 중복검사를 수행하는 루틴을 수행할 것이고 POST로 데이터를 받으면 email의 중복검사를 처리하도록 수정하였다. 그에 따라 serializer는 다음과 같다.
+
+```python
+from rest_framework import serializers
+from user.models import Account
+
+
+class AccountSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField()
+
+    class Meta:
+        model = Account
+        fields = '__all__'
+        extra_kwargs = {"password": {"write_only": True}}
+
+    def validate_username(self, value):
+        if Account.objects.filter(username=value).exists():
+            raise serializers.ValidationError("이미 사용중인 아이디입니다.")
+        return "사용가능한 아이디입니다."
+
+    def validate_email(self, value):
+        if Account.objects.filter(email=value).exists():
+            raise serializers.ValidationError("해당 이메일은 이미 사용중입니다.")
+        return "사용가능한 이메일입니다."
+
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("패스워드는 최소 %s자 이상이어야 합니다." % 8)
+        return value
+
+```
+
+각각에 대해서 존재하는지에 대한 여부를 검사하는 코드를 시리얼라이저 내부에 넣어두었다. 해당 기능들은 form 데이터를 검증하여 유저를 생성하는 과정에서도 사용되기 때문에 해당 위치에 분리해두었다.
+
+```python
+from django.utils import timezone
+import datetime
+from user.forms import AccountForm
+from django.http import HttpResponse, Http404
+from django.shortcuts import render
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .serializers import AccountSerializer
+from user.models import Account
+
+class AccountList(APIView):
+    def get(self, request):
+        queryset = Account.objects.all()
+        serializer = AccountSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        email = request.data['email']
+        print('DEBUG email : ', email)
+
+"""
+id 중복 검사 : 
+GET /api/account/verify/<str:id>/
+
+email 중복 검사 : 
+POST /api/account/verify/
+"""
+class verifyExistence(APIView):
+    def getObject_with_username(self, username):
+        try:
+            return Account.objects.get(username=username)
+        except Account.DoesNotExist:
+            return "OK"
+
+    def getObject_with_email(self, email):
+        try:
+            return Account.objects.get(email=email)
+        except Account.DoesNotExist:
+            return "OK"
+
+    def get(self, request, username):
+        ac = self.getObject_with_username(username)
+        if ac == "OK":
+            return Response("사용가능한 아이디입니다.")
+        return AccountSerializer(ac).validate_username(username)
+
+    def post(self, request):
+        email = request.data['email']
+        ac = self.getObject_with_email(email)
+        if ac == "OK":
+            return Response("사용가능한 이메일입니다.")
+        return AccountSerializer(ac).validate_email(email)
+
+```
+
+views.py의 경우 verifyExistence라는 클래스가 궁극적으로 id/email의 중복검사를 수행해주는데 get과 post가 각각 id와 email에 대한 정보를 넘겨받는다. 그리고 시리얼라이저 내부의 검증코드루틴의 결과에 따라 리턴을 수행한다. 
+
+POST의 경우 csrf_token에 대한 정보가 없으면 forbidden이 발생하기 때문에 해당 부분에 대한 처리가 필요했다.
+
+```javascript
+function checkEmail(){
+  email = document.getElementById('email').value;
+  var csrf_token = $('[name=csrfmiddlewaretoken]').val();
+    if (regExp.test(email)){
+      $.ajax({
+          type: 'POST',
+          url: 'http://localhost:8000/api/accounts/verify/',
+          data : {
+              email: email,
+              csrfmiddlewaretoken: csrf_token,
+          },
+          error: function(xhr, status, error){
+              alert("이미 사용중인 이메일입니다.")
+            return false;
+          },
+          success: function(xhr){
+            alert("사용가능한 이메일입니다.");
+            return true;
+          },
+      });
+  }
+  else{
+    alert('잘못된 이메일 형식입니다');
+  };
+}
+```
+
+이를 위해서 ajax를 통해 POST 데이터를 전송할 때 csrf_token에 대한 값을 같이 날려주어야 된다. email과 csrfmiddlewaretoken을 같이 전송을 해주게 되면 그 결과가 error인지 success인지에 따라 분기를 다르게 탐으로써 조건문의 수행이 된다. 
+
+마지막으로 javascript코드를 static/js/signup.js로 분리하는 것으로 id/email 검증에 대한 구현이 마무리되었다. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
