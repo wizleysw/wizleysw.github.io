@@ -38,6 +38,8 @@ toc : true
 
 세부적인 사항은 DB를 설계하게 되면 그 때 더 심층적으로 고민을 해보도록 하고 지금해야할 것은 REST api와 Docker에 대해 이해하는 것과 그에 따라 docker-compose파일을 작성하는 것이다. 그러면 먼 여정을 시작해보도록 하자.
 
+(중간중간 생략된 값들이 있기 때문에 필자의 깃허브를 통해 코드를 확인하기를 추천하는 바이다.)
+
 ## Settings
 
 ### Django
@@ -1549,6 +1551,114 @@ class Account(AbstractBaseUser):
 AbstractBaseUser를 상속받는 방식으로 set_password와 같이 기본 메소드를 상속받는게 가능하다. 그리고 이 경우에 USERNAME_FIELD를 명시를 해줘야 한다.
 
 위와 같이 구현을 하면 회원가입에 대한 처리가 /api/account URL을 통해 POST로 처리가 된다. 
+
+
+### 이메일 인증 구현
+
+이메일 인증의 경우 아래의 사이트에 기본적인 사용방법이 적혀있다. 
+
+https://inma.tistory.com/116
+
+settings.py에 EMAIL 전송과 관련된 값들을 적어준다. 물론 중요한 아이디/패스워드 정보는 secrets.json 파일에 빼놓고 가져오는 방식을 사용한다.
+
+```python
+# Google SMTP
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST_USER = get_secretKey("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = get_secretKey("EMAIL_HOST_PASSWORD")
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+```
+
+토큰을 만드는 과정에 대한 코드는 api/views.py의 아이디 정보를 만든 뒤 생성한다.
+
+```python
+            new_account = form_data.save(commit=False)
+            new_account.set_password(form_data.cleaned_data['password'])
+            new_account.save()
+
+            user = Account.objects.get(username=form_data.cleaned_data['username'])
+            message = render_to_string('activate.html', {
+                'domain': 'localhost:8000',
+                'user': user,
+                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+                'token': account_activation_token.make_token(user)
+            })
+
+            mail_subject = 'eaten-Away 이메일 인증'
+            to_email = form_data.cleaned_data['email']
+            email = EmailMessage(mail_subject, message, to=[to_email])
+            email.send()
+```
+
+여기서 new_account로 인하여 새로운 Account 정보가 DB에 저장이 되고 난 뒤 user로 해당 계정에 대한 정보를 가져와 message를 만들어 activate.html에 파싱해준다. 이 과정에서 account_activation_token.make_token에 의하여 토큰에 대한 정보가 메일에 남게된다.
+
+```python
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+import six
+
+
+class AccountActivationTokenGenerator(PasswordResetTokenGenerator):
+    def _make_hash_value(self, user, timestamp):
+        return (
+                six.text_type(user.pk) + six.text_type(timestamp) + six.text_type(user.active)
+        )
+
+account_activation_token = AccountActivationTokenGenerator()
+```
+
+token의 경우 다음과 같이 Account의 pk정보와 timestamp 정보를 토대로 해쉬화 한다.
+
+```html
+{% raw %}
+{% load static %}
+{% load i18n %}
+{% blocktrans %}
+{{ user.username }} 님, 아래의 링크를 클릭하여 회원가입을 완료해주세요.
+{% endblocktrans %}
+http://{{ domain }}{% url 'activate' uidb64=uid token=token %}
+{% endraw %}
+```   
+
+template의 경우 email로 전송되는 값을 가지고 있는데 여기서 domain, url, uid, token의 값이 링크화 되게 된다. 그리고 이 값들은 윗 부분의 render_to_string 부분의 값을 통해 결정이 된다. 이를 통해 사용자가 회원가입을 신청하게 되면 hash된 link가 가입한 이메일 주소로 전송이 되게 된다.
+
+```
+wizley님, 아래의 링크를 클릭하여 회원가입을 완료해주세요.
+
+http://localhost:8000/api/activate/NDk/5ek-d54078f9b30b418cacf4
+```
+
+그럼 위와 같이 링크가 형성이 되고 누르게 되면 사용자 계정이 활성화 상태가 된다. 이제 해당 부분을 처리하기 위한 url 등록이 필요하다.
+
+```python
+path('activate/<str:uidb64>/<str:token>', views.EmailActivate.as_view(), name='activate')
+```
+
+```python
+class EmailActivate(APIView):
+    permission_classes = (permissions.AllowAny, )
+
+    def get(self, request, uidb64, token):
+        try:
+            uid = force_text(urlsafe_base64_decode(uidb64))
+            user = Account.objects.get(pk=uid)
+        except:
+            user = None
+        try:
+            if user is not None and account_activation_token.check_token(user, token):
+                user.status = 'O'
+                user.active = True
+                user.save()
+                return render(request, 'emailverifysuccess.html', {'result':True})
+            else:
+                return render(request, 'emailverifysuccess.html', {'result':False})
+        except:
+            return render(request, 'emailverifysuccess.html', {'result':False})
+```
+
+이제 링크에 접속이 되면 get으로 들어오는 데이터에 대해 검증을 한뒤 result의 결과에 따라 emailverifysuccess.html을 렌더하게 된다. 그 과정에서 user.status와 user.active에 대한 값이 설정이 된다. 
 
 
 
