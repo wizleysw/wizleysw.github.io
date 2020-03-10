@@ -1757,14 +1757,99 @@ python manage.py migrate --run-syncdb
 
 이와 같이 지정을 하고 나면 Account라는 custom model이 장고의 User Model로 설정이 완료된다.
 
+### jwt를 활용하여 로그인 구현
 
+Account를 User.model로 설정을 했으니 로그인 부분에 jwt 프레임워크를 사용하였다.
 
+```python
+from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token, verify_jwt_token, ObtainJSONWebToken
 
+    path('token/', obtain_jwt_token),
+    path('token/verify/', verify_jwt_token),
+    path('token/refresh/', refresh_jwt_token),
+```
 
+먼저 api의 urls.py에 다음의 3가지 경로를 추가한다. 
 
+user/views.py 부분에서 로그인을 처리하는 함수는 다음과 같다.
 
+```python
+def login(request):
+    if(request.method == 'POST'):
+        username = request.POST['username']
+        password = request.POST['password']
+        recaptcha = request.POST['g-recaptcha-response']
 
+        url = "http://localhost:8000/api/accounts/login/"
+        r = requests.post(url, data={'username': username, 'password': password, 'g-recaptcha-response': recaptcha})
 
+        if not r.json()['token']:
+            return render(request, 'login.html', {})
+        else:
+            token = r.json()['token']
+            response = HttpResponseRedirect('/user/main/')
+            response.set_cookie('token', token)
+            return response
+    else:
+        if(request.COOKIES.get('token')):
+            if checkTokenVerification(request):
+                response = HttpResponseRedirect('/user/main')
+                return response
+            else:
+                response = HttpResponseRedirect('/user/login')
+                response.delete_cookie('token')
+                return response
+        return render(request, 'login.html', {})
+```
+
+POST의 형태로 값이 들어올 경우에 /api/accounts/login으로 post요청을 보내게 된다. 그리고 그 결과값으로 token이 돌아올 경우에 token을 cookie에 추가하여 main페이지로 이동하게 된다. 만약 POST가 아닌 형식으로 login 페이지에 들어오게 된 경우 token이 cookie에 존재하는 경우에는 token에 대한 값을 검증한다. 만약 토큰이 정상적인 값이라면 main으로 바로 리다이렉트를 하고 그게 아닌 경우에 token 쿠키를 삭제한 뒤 login 폼을 띄워준다.
+
+```python
+
+"""
+post : login
+delete : logout
+"""
+class AccountAuthentication(APIView):
+    authentication_classes = (BasicAuthentication, )
+    permission_classes = (AllowAny, )
+
+    def authenticateAccount(self, username, password):
+        try:
+            AccountInfo = Account.objects.get(username=username)
+
+            if check_password(password, AccountInfo.password):
+                if AccountInfo.status == 'O':
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        except:
+            return False
+
+    def post(self, request):
+        if not checkRecaptcha(request.data['g-recaptcha-response']):
+            return Response("fail.", status=HTTP_400_BAD_REQUEST)
+
+        username = request.data['username']
+        password = request.data['password']
+
+        if self.authenticateAccount(username=username, password=password):
+            url = "http://localhost:8000/api/token/"
+            r = requests.post(url, data={'username': username, 'password': password})
+            if not r.json()['token']:
+                return Response('fail', status=HTTP_400_BAD_REQUEST)
+            else:
+                token = r.json()['token']
+                return Response({'token': token}, status=HTTP_200_OK)
+        else:
+            return Response('fail.', status=HTTP_400_BAD_REQUEST)
+
+        return Response('failed', status=HTTP_400_BAD_REQUEST)
+```
+
+api/views.py 부분에서 login을 처리할 때 불리는 루틴은 AccountAuthentication 내부의 post이다. recaptcha를 먼저 검증한 뒤 username, password를 기반으로 사용자 정보와 일치하는지 검사한다. 그 뒤 Account의 정보중에 status가 활성화 상태인 경우에 token을 발급해주는 /api/token으로 발급을 요청한다. 만약 성공적으로 발급된 경우에 token을 return 해주고 그게 아닌경우 400_BAD_REQUEST를 띄우게 된다.
 
 
 
