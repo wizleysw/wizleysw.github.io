@@ -1557,7 +1557,7 @@ AbstractBaseUser를 상속받는 방식으로 set_password와 같이 기본 메�
 
 이메일 인증의 경우 아래의 사이트에 기본적인 사용방법이 적혀있다. 
 
-https://inma.tistory.com/116
+[회원가입 인증메일 보내기](https://inma.tistory.com/116)
 
 settings.py에 EMAIL 전송과 관련된 값들을 적어준다. 물론 중요한 아이디/패스워드 정보는 secrets.json 파일에 빼놓고 가져오는 방식을 사용한다.
 
@@ -1661,6 +1661,101 @@ class EmailActivate(APIView):
 이제 링크에 접속이 되면 get으로 들어오는 데이터에 대해 검증을 한뒤 result의 결과에 따라 emailverifysuccess.html을 렌더하게 된다. 그 과정에서 user.status와 user.active에 대한 값이 설정이 된다. 
 
 
+### rest_framework의 편의성을 위한 User model 변경
+
+로그인에서 토큰방식을 사용하기 위해 고민을 하던 와중에 rest_framework의 jwt 또는 auth_token이 눈에 들어왔다. 여러 앱에 대하여 모의해킹을 하는 과정에서 많이들 사용하는 것 같았기 때문이다. 하지만 구현을 하던 중 하나의 문제를 마주하였다. 해당 값들은 BASE USER 모델에 대해서 지원을 해주기 때문에 내가 임의로 만든 Account라는 커스텀 모델에 적용이 안되는 것이다. 결국 여러모로 고민을 해보다가 많은 개발자들이 User를 사용하기 때문에 나 또한 userModel을 변경하기로 마음먹었다. 
+
+```python
+from django.db import models
+from django import forms
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+
+
+class AccountManager(BaseUserManager):
+    def create_user(self, username, password=None):
+        if not username:
+            raise ValueError('Account must have an username')
+        user = self.model(
+            username = username,
+        )
+
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, username, password):
+        user = self.create_user(
+            username,
+            password=password,
+        )
+        user.is_admin = True
+        user.save(using=self._db)
+        return user
+
+
+class Account(AbstractBaseUser):
+    account_no = models.AutoField(primary_key=True)
+
+    name = models.CharField(max_length=20, verbose_name='이름', default='Chihiro')
+    birth = models.DateField(null=True, verbose_name='생일')
+    area = models.CharField(max_length=10, verbose_name='지역', default='Seoul')
+    sex_selection = (
+        ('M', '남성'),
+        ('W', '여성'),
+    )
+    sex = models.CharField(max_length=1, verbose_name='성별', choices=sex_selection, default='W')
+
+    username = models.CharField(max_length=10, verbose_name='아이디', unique=True)
+    password = models.CharField(max_length=100, verbose_name='패스워드')
+    email = models.EmailField(max_length=32, verbose_name='이메일')
+    created_date = models.DateTimeField(auto_now_add=True, verbose_name="가입날짜")
+    comment = models.CharField(max_length=20, verbose_name='코멘트', blank=True)
+    profile = models.ImageField(upload_to="user_profile/profile_picture", verbose_name='프로필', blank=True)
+
+    account_status_selection = (
+        ('O', '정상'),
+        ('X', '삭제'),
+        ('B', '정지'),
+        ('W', '검증'),
+    )
+    status = models.CharField(max_length=1, verbose_name='계정 상태', choices=account_status_selection, default="W")
+    active = models.BooleanField(default=False, verbose_name="이메일 인증여부")
+
+    is_active = models.BooleanField(default=True)
+    is_admin = models.BooleanField(default=False)
+
+    objects = AccountManager()
+
+    USERNAME_FIELD = 'username'
+
+    def __str__(self):
+        return self.username
+
+    def has_perm(self, perm, obj=None):
+        return True
+
+    def has_module_perms(self, app_label):
+        return True
+
+    @property
+    def is_staff(self):
+        return self.is_admin
+```
+
+기존의 방식에서 username에 unique옵션을 추가해주었고, AccountManager를 추가하였다. 해당 클래스는 helper와 같은 역할을 한다. 그 뒤 settings.py에 USER_MODEL에 대한 정보를 추가하였다.
+
+```python
+# USER MODEL
+AUTH_USER_MODEL = 'user.Account'
+```
+
+그 뒤 migrations을 하려고 하는데 제대로 적용이 되지 않았다. 그래서 sqlite를 삭제하였음에도 불구하고 superuser가 이미 존재하기 때문에 작동을 제대로 하지 않는 문제가 발생하였다. 그 경우 아래의 명령어를 통해 해결이 가능하였다.
+
+```python
+python manage.py migrate --run-syncdb
+```
+
+이와 같이 지정을 하고 나면 Account라는 custom model이 장고의 User Model로 설정이 완료된다.
 
 
 
