@@ -1851,9 +1851,122 @@ class AccountAuthentication(APIView):
 
 api/views.py 부분에서 login을 처리할 때 불리는 루틴은 AccountAuthentication 내부의 post이다. recaptcha를 먼저 검증한 뒤 username, password를 기반으로 사용자 정보와 일치하는지 검사한다. 그 뒤 Account의 정보중에 status가 활성화 상태인 경우에 token을 발급해주는 /api/token으로 발급을 요청한다. 만약 성공적으로 발급된 경우에 token을 return 해주고 그게 아닌경우 400_BAD_REQUEST를 띄우게 된다.
 
+## food app 개발
+
+이제 음식과 관련된 서비스부분의 개발을 하기 위해서 food라는 이름으로 app을 새로 생성하였다.
+
+```console
+root@b099b068dc26:/code/eatenAway# django-admin startapp food
+```
+
+이제 settings.py에 해당 app을 추가한다.
+
+```python
+INSTALLED_APPS = [
+    ...
+    'user',
+    'food',
+    'api',
+]
+```
+
+### csv 파일로 bulk_create하여 음식정보 한번에 추가하기
+
+먼저 음식에 대한 DB를 생성할 것인데 그 이름을 Food라고 하겠다. 그리고 필드는 다음과 같이 설정하였다.
+
+```python
+from django.db import models
 
 
+class Food(models.Model):
+    menuname = models.CharField(verbose_name='메뉴이름', max_length=30, unique=True)
+    category = models.CharField(verbose_name='카테고리', max_length=30,)
+    country = models.CharField(verbose_name='나라', max_length=30,)
+    ingredient = models.CharField(verbose_name='재료', max_length=30, null=True)
+    taste = models.CharField(verbose_name='맛', max_length=30,)
+    stock = models.BooleanField(verbose_name='국물여부', default=False)
+    description = models.CharField(verbose_name='설명', max_length=50)
+    profile = models.ImageField(upload_to="food_profile/profile_picture", verbose_name='음식사진', blank=True)
 
+    is_active = models.BooleanField(verbose_name='활성화 여부', default=True)
+
+    def __str__(self):
+        return self.menuname
+```
+
+model에 대해서 설명을 하자면 category는 크게 밥/패스트푸드/면으로 나누었고 ingredient는 고기/해물/야채로 구분하였다. taste의 경우 단맛 ~ 보통 ~ 매운맛인데 주관적인 기준으로 1-3 ~ 4 ~ 5-7로 나누었다. description의 경우 해당 Food에 대한 탭을 표시하기 위한 설명이고 profile은 음식에 대한 사진정보가 들어간다. 
+
+이제 excel 파일을 활용하여 menuname, category, country, ingredient, taste, stock에 대한 정보를 csv파일의 형식으로 만들었다. 이제 해당 파일을 읽고 Food Model에 추가하는 코드를 작성한다.
+
+(CSV파일을 읽어서 django 모델을 bulk_create하기)[https://junebuug.github.io/2018-02-19/make-bulk-update-from-csv-django]
+
+```python
+import os
+import django
+import csv
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'eatenAway.settings')
+
+django.setup()
+
+from food.models import Food
+
+f = open('FoodList.csv', 'r', encoding='utf-8')
+info = []
+
+rdr = csv.reader(f)
+
+for row in rdr:
+    menuname, category, country, ingredient, taste, stock, description, tmp = row
+    if stock == 'TRUE':
+        stock = True
+    else:
+        stock = False
+    tuple = (menuname, category, country, ingredient, taste, stock, description)
+    info.append(tuple)
+
+f.close()
+
+instances = []
+for (menuname, category, country, ingredient, taste, stock, description) in info:
+    instances.append(Food(menuname=menuname, category=category, country=country, ingredient=ingredient, taste=taste, stock=stock))
+
+Food.objects.bulk_create(instances)
+```
+
+이제 해당 코드를 실행시키면 정상적으로 Food에 추가되는 것을 확인할 수 있다.
+
+```console
+root@b099b068dc26:/code/eatenAway# python bulk.py
+['menuname', 'category', 'country', 'ingredient', 'taste', 'stock', 'description', '']
+['간장 치킨', '패스트푸드', '한국', '고기', '1', 'FALSE', '', '']
+['양념 치킨', '패스트푸드', '한국', '고기', '3', 'FALSE', '', '']
+['그라탕', '패스트푸드', '이탈리아', '야채', '4', 'FALSE', '', '']
+['피자', '패스트푸드', '이탈리아', '야채', '4', 'FALSE', '', '']
+['피시앤칩스', '패스트푸드', '영국', '해물', '4', 'FALSE', '', '']
+['반미', '패스트푸드', '베트남', '고기', '3', 'FALSE', '', '']
+['버거킹', '패스트푸드', '미국', '고기', '2', 'FALSE', '', '']
+['서브웨이', '패스트푸드', '미국', '고기', '4', 'FALSE', '', '']
+['수제버거', '패스트푸드', '미국', '고기', '2', 'FALSE', '', '']
+['시카고피자', '패스트푸드', '미국', '고기', '4', 'FALSE', '', '']
+['치즈버거', '패스트푸드', '미국', '고기', '3', 'FALSE', '', '']
+['핫도그', '패스트푸드', '미국', '고기', '2', 'FALSE', '', '']
+['햄버거', '패스트푸드', '미국', '고기', '2', 'FALSE', '', '']
+['후라이드 치킨', '패스트푸드', '미국', '고기', '4', 'FALSE', '', '']
+['갈비찜', '밥', '한국', '고기', '1', 'FALSE', '', '']
+['갈치조림', '밥', '한국', '해물', '1', 'FALSE', '', '']
+['감자탕', '밥', '한국', '고기', '3', 'TRUE', '', '']
+['경양식 돈가스', '밥', '한국', '고기', '2', 'FALSE', '', '']
+['고등어 구이', '밥', '한국', '해물', '3', 'FALSE', '', '']
+['곱창', '밥', '한국', '고기', '5', 'FALSE', '', '']
+['김밥', '밥', '한국', '야채', '4', 'FALSE', '', '']
+['김치볶음밥', '밥', '한국', '고기', '3', 'FALSE', '', '']
+['김치찌개', '밥', '한국', '야채', '5', 'TRUE', '', '']
+['낙지볶음', '밥', '한국', '해물', '6', 'FALSE', '', '']
+['단팥죽', '밥', '한국', '야채', '1', 'TRUE', '', '']
+['닭발', '밥', '한국', '고기', '7', 'FALSE', '', '']
+['닭볶음탕', '밥', '한국', '고기', '5', 'TRUE', '', '']
+['닭불고기덮밥', '밥', '한국', '고기', '5', 'FALSE', '', '']
+```
 
 
 
