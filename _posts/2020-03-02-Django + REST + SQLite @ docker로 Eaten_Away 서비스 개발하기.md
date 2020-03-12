@@ -1968,6 +1968,52 @@ root@b099b068dc26:/code/eatenAway# python bulk.py
 ['닭불고기덮밥', '밥', '한국', '고기', '5', 'FALSE', '', '']
 ```
 
+### menu에 대한 정보 뿌려주는 페이지 작성하기
+
+이전과 비슷한 형식이다. REST로 음식에 대한 정보를 가져와 response로 돌려주고 그에 대한 결과를 기준으로 template에 뿌려주면 된다.
+
+```python
+    path('food/', views.FoodList.as_view()),
+    path('food/<str:foodname>', views.FoodList.as_view()),
+```
+
+api의 url로는 2개를 추가했는데 위는 post, 밑은 get을 처리해준다. post의 경우 해당 메뉴의 이미지를 돌려주고 아래의 food/피자 형식의 url은 메뉴에 대한 여러 정보를 리턴해준다.
+
+```python
+from django.urls import path, include
+from . import views
+
+urlpatterns = [
+    path('test/',  views.testPage, name='test'),
+    path('menu/<str:foodname>', views.testPage, name='menu'),
+]
+```
+
+food의 url에 menu/foodname을 추가하였으니 이제 localhost:8000/food/menu/피자의 형식으로 접근을 하게되면 해당 메뉴에 대한 정보를 뿌려주게 된다. 그를 위해서 다음과 같이 코드를 작성하였다.
+
+```python
+from django.shortcuts import render, redirect
+import requests
+from .models import Food
+
+
+def testPage(request, foodname):
+    url = "http://localhost:8000/api/food/"
+    r = requests.get(url+foodname)
+    if not r.status_code == 200:
+        return redirect('/user/intro/')
+    menu = r.json()
+
+    r = requests.post(url, data={'foodname': menu['menuname']})
+    if r.status_code == 200:
+        img = r.raw.read()
+        print(len(img))
+
+    return render(request, 'foodmenu.html', {'menu':menu})
+```
+
+json 형식으로 menu를 받아와 그와 관련된 값들을 template에서 menu.taste와 같은 형식으로 뿌려준다. 그리고 그 뒤 post는 이미지 파일에 대한 정보를 가져오는 것은 확인하였지만 로직상 받아서 처리해주기가 어려웠기에 주석처리를 한 부분이다. 이렇게 받아온 정보를 토대로 template에 뿌려주면 해당 탭에 대한 구현이 끝나게 된다. 
+
 
 
 
