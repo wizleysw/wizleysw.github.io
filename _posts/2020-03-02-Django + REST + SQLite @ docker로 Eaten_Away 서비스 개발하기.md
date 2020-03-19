@@ -2217,3 +2217,121 @@ menuDetail 부분이 음식에 대한 세부정보를 뿌려주는데 그 부분
 ![porklet_graph](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/porklet_graph.png)
 
 이렇게 graph에 대한 부분을 구글차트를 활용하여 구현할 수 있었다.
+
+### 사용자에게 맞는 음식 추천하기
+
+사실 음식을 추천하는 기능은 중요한 기능인데 추천 알고리즘 및 AI에 대한 기초가 전혀 없기 때문에 random에 의존한 방식으로 구현을 하였다. 음식은 총 7가지를 추천하며 다음에 의거한다.
+
+1. 최근에 제일 많이 먹은 음식
+2. 최근에 먹은 음식들의 taste 평균에 해당되는 음식
+3. 최근에 먹은 음식들 중 가장 많이 소비한 재료로 이루어진 음식
+4. 최근에 먹은 음식들 중 가장 많이 소비한 근원지(나라)의 음식
+5. 최근에 먹은 음식들 중 가장 많이 소비한 카테고리의 음식
+6. 완전 랜덤
+7. 완전 랜덤
+
+역시나 url을 추가해준다. 아참, 이 추천 코드의 경우 사용자에 대한 정보가 존재하지 않을 시 추천에 대한 결과를 가져오지 못한다. 또한 코드가 반복되고 효율적이지 않기 때문에 이런식으로 코드를 짜서 흉내냈구나 정도로만 생각해주면 좋겠다.
+
+```python
+    path('food/preference/<str:username>', views.UserFoodPreferenceList.as_view()),
+```    
+
+처리하는 부분에 대한 코드는 다음과 같다.
+
+```python
+
+class UserFoodPreferenceList(APIView):
+    # FIXME : AUTHENTICATION, PERMISSION LEVEL TO TOKEN
+    authentication_classes = (BasicAuthentication,)
+    permission_classes = (AllowAny,)
+
+    def get(self, request, username):
+        try:
+            data = DailyUserFood.objects.filter(username=username, date__range=[datetime.date.today() - datetime.timedelta(days=9), datetime.date.today()])
+            if not data.exists():
+                return Response('no info', HTTP_400_BAD_REQUEST)
+            else:
+                res = dict()
+                mostpick = dict()
+                categories = dict()
+                ingredients = dict()
+                countries = dict()
+
+                count = 0
+                taste = 0
+                for row in data:
+                    foodname = row.food
+                    foodname_based_data = Food.objects.get(menuname=foodname)
+                    taste += int(foodname_based_data.taste)
+
+                    if not foodname_based_data.menuname in mostpick:
+                        mostpick[foodname_based_data.menuname] = 1
+                    else:
+                        mostpick[foodname_based_data.menuname] += 1
+
+                    if not foodname_based_data.ingredient in ingredients:
+                        ingredients[foodname_based_data.ingredient] = 1
+                    else:
+                        ingredients[foodname_based_data.ingredient] += 1
+
+                    if not foodname_based_data.category in categories:
+                        categories[foodname_based_data.category] = 1
+                    else:
+                        categories[foodname_based_data.category] += 1
+
+                    if not foodname_based_data.country in countries:
+                        countries[foodname_based_data.country] = 1
+                    else:
+                        countries[foodname_based_data.country] += 1
+
+                    count += 1
+
+                taste = int(taste/count)
+                mostpick = sorted(mostpick.items(), key=operator.itemgetter(1), reverse=True)
+                ingredients = sorted(ingredients.items(), key=operator.itemgetter(1), reverse=True)
+                categories = sorted(categories.items(), key=operator.itemgetter(1), reverse=True)
+                countries = sorted(countries.items(), key=operator.itemgetter(1), reverse=True)
+
+                res['모스트 원픽'] = Food.objects.filter(menuname=mostpick[0][0]).order_by("?").first().menuname
+
+                tmp = Food.objects.filter(taste=taste).order_by("?").first().menuname
+                while tmp in res.values():
+                    tmp = Food.objects.filter(taste=taste).order_by("?").first().menuname
+                res['평균적인 맛에 의거한 추천'] = tmp
+
+                tmp = Food.objects.filter(ingredient=ingredients[0][0]).order_by("?").first().menuname
+                while tmp in res.values():
+                    tmp = Food.objects.filter(ingredient=ingredients[0][0]).order_by("?").first().menuname
+                res['재료에 의한 추천'] = tmp
+
+                tmp = Food.objects.filter(category=categories[0][0]).order_by("?").first().menuname
+                while tmp in res.values():
+                    tmp = Food.objects.filter(category=categories[0][0]).order_by("?").first().menuname
+                res['음식의 종류에 따른 추천'] = tmp
+
+                tmp = Food.objects.filter(country=countries[0][0]).order_by("?").first().menuname
+                while tmp in res.values():
+                    tmp = Food.objects.filter(country=countries[0][0]).order_by("?").first().menuname
+                res['특정 나라음식 추천'] = tmp
+
+                tmp = Food.objects.order_by("?").first().menuname
+                while tmp in res.values():
+                    tmp = Food.objects.order_by("?").first().menuname
+                res['랜덤 추천'] = tmp
+
+                tmp = Food.objects.order_by("?").first().menuname
+                while tmp in res.values():
+                    tmp = Food.objects.order_by("?").first().menuname
+                res['묻지마 추천'] = tmp
+                return Response(res, HTTP_200_OK)
+        except:
+            return Response(HTTP_400_BAD_REQUEST)
+```
+
+말 그래도 사용자가 최근에 먹은 음식에 대한 정보를 가져와 dict으로 조합한 뒤 그 정보를 기준으로 order_by(?) 를 사용하여 랜덤으로 가져와서 res에 넣어서 돌려준다. 그 과정에서 각각의 음식이 겹치지 않도록 while문으로 처리를 해주었다.(분명 더 좋은 방식이 있으리라...)
+
+
+
+
+
+
