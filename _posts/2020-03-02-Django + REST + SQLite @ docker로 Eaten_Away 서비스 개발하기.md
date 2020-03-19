@@ -2014,16 +2014,206 @@ def testPage(request, foodname):
 
 json 형식으로 menu를 받아와 그와 관련된 값들을 template에서 menu.taste와 같은 형식으로 뿌려준다. 그리고 그 뒤 post는 이미지 파일에 대한 정보를 가져오는 것은 확인하였지만 로직상 받아서 처리해주기가 어려웠기에 주석처리를 한 부분이다. 이렇게 받아온 정보를 토대로 template에 뿌려주면 해당 탭에 대한 구현이 끝나게 된다. 
 
+### 사용자 정보 그래프로 뿌려주기
 
+오랜만에 다시 글을 이어 적는듯한 느낌인데 흠흠, 사용자가 먹은 음식에 대한 부분을 뿌려주기는 모습을 상상하였기 때문에 당연히 해당 부분에 대한 처리 부분을 만들어주어야 했다. 사용자에 그래프 정보는 크게 3가지로 나누어서 구현하였다.
 
+1. 최근 9일간 먹은 음식의 횟수에 따른 통계
+2. 최근 9일간 먹은 음식의 종류를 날짜에 따라 아침/점심/저녁 통계
+3. 특정 음식을 아침/점심/저녁을 기준으로 비율에 대한 통계
 
+그래프의 경우 직접 그릴 실력은 안되기 때문에 많은 고민을 했었는데 구글차트에서 땡겨와 쓸 수가 있었다. 그렇게 가져온 형식은 다음과 같다.
 
+```html
+{% raw %}
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 
+<script type="text/javascript">
+    google.charts.load("current", {packages:['corechart']});
+    google.charts.setOnLoadCallback(drawChart);
+    function drawChart() {
+      var data = google.visualization.arrayToDataTable([
+       ["Element", "먹은 횟수", { role: "style" } ],
+        {% for key, value in foodcount.items %}
+        {% if forloop.counter == 1 %}
+        ["{{ key }}", {{ value }}, "gold"],
+        {% elif forloop.counter == 2 %}
+        ["{{ key }}", {{ value }}, "silver"],
+        {% elif forloop.counter == 3 %}
+        ["{{ key }}", {{ value }}, "color: #b87333"],
+        {% else %}
+        ["{{ key }}", {{ value }}, "color: #e5e4e2"],
+        {% endif %}
+        {% endfor %}
+      ]);
 
+      var view = new google.visualization.DataView(data);
+      view.setColumns([0, 1,
+                       { calc: "stringify",
+                         sourceColumn: 1,
+                         type: "string",
+                         role: "annotation" },
+                       2]);
 
+      var options = {
+        width: 900,
+        height: 600,
+        bar: {groupWidth: "95%"},
+        legend: { position: "none" },
+      };
+      var chart = new google.visualization.ColumnChart(document.getElementById("columnchart_values"));
+      chart.draw(view, options);
+  }
 
+  function goFood(){
+    redirect_url = "http://localhost:8000/food/menu/" + document.getElementById('gowithfoodname').value;
+    window.location.href = redirect_url;
+  }
+  </script>
+{% endraw %}
+```
 
+위와 같이 javascript를 통해 그래프를 임의로 그리는 것이 가능하다. 위의 코드는 음식을 먹은 횟수에 따라 막대그래프에 그려주는 코드 부분이다. 
 
+![graph_food](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/graph_food.png)
 
+해당 부분의 값을 채우기 위해서 api을 하나 생성하였는데 url은 다음과 같다.
 
+```python
+    path('food/user/<str:username>', views.UserDailyFoodList.as_view()),
+```
 
+세부 코드를 보면 get과 post로 값을 받는다. get은 위의 그래프와 Food TimeTable기능을 처리하기 위한 api이다.
+
+```python
+class UserDailyFoodList(APIView):
+    # FIXME : AUTHENTICATION, PERMISSION LEVEL TO TOKEN
+    authentication_classes = (BasicAuthentication,)
+    permission_classes = (AllowAny,)
+
+    def get(self, request, username):
+        if not username:
+            return Response(HTTP_400_BAD_REQUEST)
+        try:
+            data = DailyUserFood.objects.filter(username=username, date__range=[datetime.date.today() - datetime.timedelta(days=9), datetime.date.today()])
+            if not data.exists():
+                return Response('no info', HTTP_400_BAD_REQUEST)
+            else:
+                res = dict()
+                foodcount = dict()
+                dateinfo = dict()
+                for row in data:
+
+                    if not row.food in foodcount:
+                        foodcount[row.food] = 1
+                    else:
+                        foodcount[row.food] +=1
+
+                    if not str(row.date) in dateinfo:
+                        dateinfo[str(row.date)] = dict()
+                        dateinfo[str(row.date)][row.mealkind] = row.food
+
+                    else:
+                        dateinfo[str(row.date)][row.mealkind] = row.food
+
+                res['foodcount'] = foodcount
+                res['dateinfo'] = sorted(dateinfo.items())
+                json_res = json.dumps(res)
+                return Response(json_res, HTTP_200_OK)
+        except:
+            return Response(HTTP_400_BAD_REQUEST)
+
+    def post(self, request, username):
+        if not username:
+            return Response(HTTP_400_BAD_REQUEST)
+        if not request.POST.get('foodname'):
+            return Response(status=HTTP_400_BAD_REQUEST)
+        try:
+            data = DailyUserFood.objects.filter(username=username, food=request.data['foodname'])
+            if not data.exists():
+                return Response(HTTP_400_BAD_REQUEST)
+            else:
+                res = dict()
+                for row in data:
+                    if not row.mealkind in res:
+                        res[row.mealkind] = 1
+                    else:
+                        res[row.mealkind] += 1
+                    json_res = json.dumps(res)
+                return Response(json_res, HTTP_200_OK)
+        except:
+            return Response(HTTP_400_BAD_REQUEST)
+```            
+
+dictionary 형태는 대략적으로 나타내보면 아래와 같다.
+
+```python
+{
+  foodcount:{
+    '돈가스': 4,
+    '피자': 3,
+    ...
+  }
+  dateinfo:{
+    '2020-03-10' :{
+        'B' : 돈가스 
+        'L' : 피자
+        'D' :
+    },
+    '2020-03-11' :{
+        'B' :
+        'L' :
+        'D' :
+    }
+  }
+}
+```
+
+이렇게 가져온 값들을 view에서 처리한 뒤에 뿌려주면 된다. (url에서는 jwt_value내에 username을 넣어놨기 때문에 해당 정보를 토대로 요청을 하면 된다.)
+
+```python
+url = "http://localhost:8000/api/food/user/"
+r = requests.get(url+jwt_value['username'])
+try:
+    res = json.loads(r.json())
+    return render(request, 'main.html', {'username':jwt_value['username'], 'foodcount':res['foodcount'], 'dateinfo':res['dateinfo'], 'choice':choice})
+except:
+    return render(request, 'main.html', {'username':jwt_value['username'], 'choice':choice})
+```
+
+dateinfo 부분을 토대로 가공하면 아래와 같이 TimeTable을 생성할 수 있다.
+
+![food_timetable](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/food_timetable.png)
+
+위의 UserDailyFoodList 클래스의 post 부분은 특정 메뉴에 대한 아침/점심/저녁에 먹은 비율에 대한 그래프를 표시하는데 사용된다. 
+
+```python
+def menuDetail(request, foodname):
+    if (request.COOKIES.get('token')):
+        if checkTokenVerification(request):
+            jwt_value = jwt.decode(request.COOKIES.get('token'), JWT_AUTH['JWT_SECRET_KEY'])
+            url = "http://localhost:8000/api/food/user/"
+            r = requests.post(url+jwt_value['username'], data={'foodname': foodname})
+            try:
+                chart = json.loads(r.json())
+            except:
+                chart = {'nope':1}
+
+            url = "http://localhost:8000/api/food/"
+            r = requests.get(url + foodname)
+            if not r.status_code == 200:
+                return redirect('/user/main/')
+            menu = r.json()
+
+            url = "http://localhost:8000/food/user/"
+            return render(request, 'foodmenu.html', {'username':jwt_value['username'], 'menu': menu, 'chart': chart})
+
+    else:
+        return redirect('/user/intro/')
+```
+
+menuDetail 부분이 음식에 대한 세부정보를 뿌려주는데 그 부분에서 post로 foodname을 보내주게 되면 횟수에 대한 결과를 res[row.mealkind] 인 B/L/D 로 추가된다. 해당 결과를 뿌려주기만 하면 된다.
+
+![porklet_graph](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/porklet_graph.png)
+
+이렇게 graph에 대한 부분을 구글차트를 활용하여 구현할 수 있었다.
