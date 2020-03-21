@@ -1223,7 +1223,7 @@ class is_email_exist(APIView):
         if ac == "OK":
             return Response("사용가능한 이메일입니다.")
         return AccountSerializer(ac).validate_email(email)
-        ```
+```
 
 그리고 해당 부분을 handle하는 확인 코드를 XMLHttpRequest를 활용하여 작성하였다.
 
