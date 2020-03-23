@@ -18,19 +18,19 @@ toc : true
 
 이번에 서비스의 주제로 정한 키워드는 "음식"이다. 내 일과를 생각해보았을 때, 아침, 점심, 저녁에 뭘 먹을지에 대한 고민이 꽤 큰 비율을 차지한다. 그래서 이번 프로젝트는 다음의 기능을 가지고 있는 서비스를 개발하고자 한다.
 
-1. RANDOM으로 추천메뉴를 가져온 뒤 상점의 리스트를 사용자에게 보여준 뒤 하나를 선택할 시 상세정보를 확인(맵, 평점 등)
-2. 먹고 싶은 메뉴 등의 조건필터링 후의 결과 확인
-3. 개개인이 먹은 메뉴 정보를 저장하여 한달동안 어떤 음식을 몇번이나 또는 얼마만의 주기마다 먹었는지를 확인하여 그래프 등으로 표시하는 기능
+1. RANDOM으로 추천메뉴를 가져온 뒤 선택할 시 메뉴에 대한 상세 정보 및 상점의 리스트를 사용자에게 보여주는 기능
+2. 먹고 싶은 메뉴를 검색하여 조회 
+3. 개개인이 먹은 메뉴 정보를 저장하여 특정 주기동안 임의의 음식을 몇번이나 또는 얼마만의 주기마다 먹었는지를 확인하여 그래프 등으로 표시하는 기능
 
 그리고 해당 개념을 토대로 구현하고자 하는 세부적인 목표를 정하자면 다음과 같다.
 
 1. 회원가입 / 로그인 -> 메일 인증 기능
-2. 개인정보 열람(본인에 의하여/타인에 의하여) 및 수정
+2. 음식관련 개인정보 열람(본인에 의하여/타인에 의하여) 및 수정
 3. 게시물의 댓글 + 대댓글 기능 구현
 4. 맵 관련 api 연동
 5. 실시간 대화 or 1:1 대화방 구현
 
-약간 배달 어플과 흡사한 기능을 가지고 있다고 볼 수도 있을 것 같다. 어쩌면 거의 같을지도 모르겠다. 적는 지금 생각을 해보니 음식점에 대한 정보를 업데이트 하기 위해서 DB에서 사용자에 대한 정보를 다음과 같이 세분화 할 수 있을 것 같다.
+약간 배달 어플과 흡사한 기능을 가지고 있다고 볼 수도 있을 것 같다. 어쩌면 거의 같을지도 모르겠다. 적는 지금 생각을 해보니 음식점에 대한 정보를 업데이트 하기 위해서 DB에서 사용자에 대한 정보를 다음과 같이 세분화 할 수 있을 것 같다. 점주 부분의 경우 추가하지 않을 수도 있음!
 
 1. 사용자
 2. 점주
@@ -2329,6 +2329,129 @@ class UserFoodPreferenceList(APIView):
 ```
 
 말 그래도 사용자가 최근에 먹은 음식에 대한 정보를 가져와 dict으로 조합한 뒤 그 정보를 기준으로 order_by(?) 를 사용하여 랜덤으로 가져와서 res에 넣어서 돌려준다. 그 과정에서 각각의 음식이 겹치지 않도록 while문으로 처리를 해주었다.(분명 더 좋은 방식이 있으리라...)
+
+### 사용자가 먹은 음식에 대한 정보 등록하는 페이지 생성
+
+음식에 대한 조회 및 결과를 그래프로 뿌려주는 것이 main의 역할이기 때문에 결국 사용자가 자신이 어떤 음식을 먹었는지에 대한 정보를 DB에 업데이트를 해야된다. 그를 위해서 UI에서 사용자로부터 입력을 쉽게 받을 수 있도록 하는 작업이 필요하다.
+
+방식은 기존과 크게 다르지 않다. food 부분에 url을 3개를 추가해주어서 관리를 담당하도록 설계하였다.
+
+```python
+from django.urls import path, include
+from . import views
+
+urlpatterns = [
+    path('menu/<str:foodname>', views.menuDetail, name='menu'),
+    path('addmenu/', views.addMenu, name='addmenu'),
+    path('checkdatemenu/', views.checkDateMenu, name='checkdatemenu'),
+    path('updatedatemenu/', views.updateDateMenu, name='updatedatemneu'),
+]
+```
+
+addmenu는 사용자로부터 날짜를 입력받는 첫 페이지이다. 해당 정보가 post로 넘어가게 되면 checkdatemenu부분에서는 아침/점심/저녁으로 해당 날짜에 저장된 값을 가져온다. 그리고 사용자는 아래의 form을 활용하여 새로운 데이터를 추가하거나 기존의 것을 수정하는 것이 가능하다. 위에 대한 처리를 위해 api 쪽의 url도 추가해주었다. 
+
+```python
+    path('food/date/<str:username>/<str:date>', views.UserFoodByDate.as_view()),
+    path('food/date/<str:username>', views.UserFoodByDate.as_view()),
+```
+
+get은 특정 날짜의 사용자의 음식메뉴에 대한 정보를 가져올때 호출이 되며 post는 값을 저장할때 호출이 된다. 
+
+```python
+'''
+get : 특정 일자의 유저의 아침/점심/저녁 리스트 리턴
+post : 특정 일자의 아침/점심/저녁 정보 추가 또는 업데이트 및 삭제
+'''
+class UserFoodByDate(APIView):
+    # FIXME : AUTHENTICATION, PERMISSION LEVEL TO TOKEN
+    authentication_classes = (BasicAuthentication,)
+    permission_classes = (AllowAny,)
+
+    def get(self, request, username, date):
+        data = DailyUserFood.objects.filter(username=username, date=date)
+        if not data.exists():
+            return Response(HTTP_400_BAD_REQUEST)
+        else:
+            res = {}
+            res['B'] = res['L'] = res['D'] = '-'
+            for row in data:
+                res[row.mealkind] = row.food
+            return Response(res, HTTP_200_OK)
+
+
+    def post(self, request, username):
+        try:
+            date = request.data['date']
+            mealkind = request.data['mealkind']
+            foodname = request.data['foodname']
+            food_data = Food.objects.get(menuname=foodname)
+            mealkind_choice = ['B', 'L', 'D']
+            if not mealkind in mealkind_choice:
+                return Response(HTTP_400_BAD_REQUEST)
+        except:
+            return Response(HTTP_400_BAD_REQUEST)
+        try:
+            data = DailyUserFood.objects.get(username=username, date=date, mealkind=mealkind)
+            data.food = foodname
+            data.save()
+            return Response(HTTP_201_CREATED)
+
+        except DailyUserFood.DoesNotExist:
+            data = DailyUserFood(username=username, food=foodname, mealkind=mealkind, date=date)
+            data.save()
+            return Response(HTTP_201_CREATED)
+```
+
+이제 food의 views쪽에서 form의 값을 토대로 REST통신을 한 결과값을 처리해주기만 하면 된다.
+
+```python
+
+def addMenu(request):
+    if(request.COOKIES.get('token')):
+        if checkTokenVerification(request):
+            return render(request, 'addmenu.html', {})
+    else:
+        return redirect('/user/intro')
+
+
+def checkDateMenu(request):
+    if(request.COOKIES.get('token')):
+        if checkTokenVerification(request):
+            jwt_value = jwt.decode(request.COOKIES.get('token'), JWT_AUTH['JWT_SECRET_KEY'])
+            url = "http://localhost:8000/api/food/date/"
+            r = requests.get(url + jwt_value['username'] + '/' + request.POST['date'])
+            if not r.status_code == 200:
+                dateres = {}
+            else:
+                dateres = r.json()
+
+            return render(request, 'checkdatemenu.html', {'username':jwt_value['username'], 'date':request.POST['date'], 'Breakfast':dateres['B'], 'Lunch':dateres['L'], 'Dinner':dateres['D']})
+    else:
+        return redirect('/user/intro')
+
+
+def updateDateMenu(request):
+    if(request.COOKIES.get('token')):
+        if checkTokenVerification(request):
+            jwt_value = jwt.decode(request.COOKIES.get('token'), JWT_AUTH['JWT_SECRET_KEY'])
+            url = "http://localhost:8000/api/food/date/"
+            r = requests.post(url + jwt_value['username'], data=request.POST)
+            if not r.status_code == 200:
+                msg = '정보를 다시 확인해주세요.'
+
+            else:
+                msg = '요청이 정상적으로 반영되었습니다.'
+
+            r = requests.get(url + jwt_value['username'] + '/' + request.POST['date'])
+            if not r.status_code == 200:
+                dateres = {}
+            else:
+                dateres = r.json()
+
+            return render(request, 'updatedatemenu.html', {'msg':msg, 'date':request.POST['date'], 'Breakfast':dateres['B'], 'Lunch':dateres['L'], 'Dinner':dateres['D']})
+
+```
+
 
 
 
