@@ -2452,9 +2452,75 @@ def updateDateMenu(request):
 
 ```
 
+### kakao map api 연동하기
+
+당장 구현하고 싶었던 것은 menu탭에서 특정 음식 목록에 들어갔을 때 사용자의 area 정보를 토대로 근처의 해당 음식점에 대한 정보를 맵으로 표현해주는 것이었다. 이를 위해서 네이버와 카카오 맵 api를 써보았는데 예제부터가 카카오가 훨씬 자세하고 쓰기가 간편했다. 거의 수정을 안하고 사용하였다!!
+
+[KAKAO MAP api](http://apis.map.kakao.com/web/sample/keywordList/)
+
+kakao map api 관련 key를 입력받은 뒤 그대로 적용해주면 된다. 이를 위해서 사용자 DB로부터 area에 대한 정보를 가져왔던 /api/accounts/profile의 정보와 menuname을 토대로 검색 부분만 변경해주면 된다.
+
+```html
+{% raw %}
+<section class="wrapper style1 align-center">
+    <div class="inner">
+        <h2>Good place to eat {{ menu.menuname }} nearby</h2>
+        <p>{{ username}} 님이 등록하신 주소지인 <strong>{{ user_profile.area }}</strong> 기준으로 근처 맛집을 검색해보았어요.</p>
+
+        <section>
+            <div class="content" align="center">
+
+                <div class="map_wrap">
+                    <div id="map" style="width:100%;height:100%;position:relative;overflow:hidden;"></div>
+
+                    <div id="menu_wrap" class="bg_white">
+                        <div class="option">
+                            <div>
+                                <form onsubmit="searchPlaces(); return false;">
+                                    키워드 : <input type="text" value="{{ user_profile.area }} {{ menu.menuname }} 맛집" id="keyword" size="15">
+                                    <button type="submit">검색하기</button>
+                                </form>
+                            </div>
+                        </div>
+                        <hr>
+                        <ul id="placesList"></ul>
+                        <div id="pagination"></div>
+                    </div>
+                </div>
 
 
+            </div>
+        </section>
+    </div>
+</section>
+{% endraw %}
+```
 
+그러면 아래와 같이 이쁜 지도창을 구현할 수 있다. 
+
+![foodmap](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/eatenAway/foodmap.png)
+
+### DailyUserFood REST DELETE로 삭제하기
+
+그 전에 수정과 추가는 구현을 했었는데 DELETE 부분에 대한 구현을 끝마치지 않았었다. 이를 위해서 url을 하나 추가하였다.
+
+```python
+path('food/date/<str:username>/<str:date>/<str:mealkind>', views.UserFoodByDate.as_view()),
+```
+
+DELETE의 경우 data를 같이 넘기지 못하기 때문에 쿼리 조회에 필요한 정보인 username, date, mealkind를 url로 입력을 받기로 하였다. 
+
+```python
+def delete(self, request, username, date, mealkind):
+    try:
+        data = DailyUserFood.objects.get(username=username, date=date, mealkind=mealkind)
+        data.delete()
+        return Response(HTTP_200_OK)
+    except:
+        return Response(HTTP_400_BAD_REQUEST)
+```            
+
+그리고 위와 같이 get을 통해 찾은 뒤 delete를 하도록 설정해주면 끝이 난다. 
 
 
 
