@@ -2891,7 +2891,7 @@ Authorization 부분에 JWT + token 값을 추가해주면 성공할 경우에�
 대댓글 기능을 구현하지 않긴 하였지만 해당 서비스에서 굳이 필요한 기능이라고 판단되지 않았기 때문에 과감히 생략하였다. 아래의 링크를 통해 전체 소스 코드를 확인가능하다.
 (url에 대한 부분은 완전하게 설정을 하지 않았고, DEBUG 모드도 True인 상태이다.)
 
-[eaten-Away 결과물](https://butter-shower.tistory.com/49?category=718374)
+[eaten-Away 결과물](https://github.com/wizleysw/eatenAway)
 
 
 
