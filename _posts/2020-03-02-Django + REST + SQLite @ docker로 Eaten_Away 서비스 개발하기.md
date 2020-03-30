@@ -2523,4 +2523,375 @@ def delete(self, request, username, date, mealkind):
 그리고 위와 같이 get을 통해 찾은 뒤 delete를 하도록 설정해주면 끝이 난다. 
 
 
+## 리팩토링 및 API에 JWT 권한 설정
+
+구현하고자 하는 기능들을 대부분 구현한 후에 해야되는 것은 리팩토링 작업이다! 내가 짱짱 개발자가 아니기 때문에 무조건적으로 코드를 손봐야되는데 views.py의 가독성을 높히는 방향으로 가고자하였고, 각각을 클래스화시켜서 나누는 방식으로 진행하였다.
+
+### user app 리팩토링
+
+기존의 코드를 user app 하위에 새 파일을 작성하여 관리하였다. views.py에서 요청하는 requests를 apis.py 하위의 클래스에 통일하여 배치하였다.
+
+```python
+import requests
+import operator
+import json
+
+
+class APIAboutUser:
+    def __init__(self, username, token):
+        self.username = username
+        self.token = token
+
+    def get_user_token(self, password, recaptcha):
+        url = "http://localhost:8000/api/accounts/login/"
+        r = requests.post(url, data={'username': self.username, 'password': password, 'g-recaptcha-response': recaptcha})
+        if r.status_code == 200:
+            res = r.json()['token']
+        else:
+            res = None
+        return res
+
+    def get_user_profile(self):
+        url = "http://localhost:8000/api/accounts/profile/"
+        r = requests.get(url + self.username, headers={'Authorization': 'JWT ' + self.token})
+        if r.status_code == 200:
+            res = r.json()
+        else:
+            res = None
+        return res
+
+    def get_user_preference(self):
+        url = "http://localhost:8000/api/food/preference/"
+        r = requests.get(url + self.username, headers={'Authorization': 'JWT ' + self.token})
+        if r.status_code == 200:
+            res = r.json()
+        else:
+            res = None
+        return res
+
+    def get_user_foodcount(self):
+        url = "http://localhost:8000/api/food/user/"
+        r = requests.get(url + self.username, headers={'Authorization': 'JWT ' + self.token})
+        if r.status_code == 200:
+            print(r.json())
+            res = json.loads(r.json())
+            if res is not None:
+                res2 = res['dateinfo']
+                res3 = sorted(res['foodcount'].items(), key=operator.itemgetter(1), reverse=True)
+        else:
+            res2 = res3 = None
+        return res2, res3
+```
+
+그리고 token관련 작업 또한 tokens.py를 새로 만들어서 관리하는 방식으로 변경하였다.
+
+```python
+from eatenAway.settings import JWT_AUTH
+import requests
+import jwt
+
+
+class Token:
+    def __init__(self, token):
+        self.token = token
+
+    def has_token(self):
+        if self.token is not None:
+            return True
+        else:
+            return False
+
+    def get_account_token(self, username, password):
+        url = "http://localhost:8000/api/token/"
+        r = requests.post(url, data={'username': username, 'password': password})
+        if r.status_code == 200:
+            res = r.json()['token']
+        else:
+            res = None
+        return res
+
+    def verify(self):
+        if self.has_token():
+            url = "http://localhost:8000/api/token/verify/"
+            r = requests.post(url, data={'token': self.token})
+            if r.status_code == 200 and r.json()['token']:
+                return True
+            else:
+                return False
+        return False
+
+    def decode_jwt(self):
+        if self.has_token() and self.verify():
+            return jwt.decode(self.token, JWT_AUTH['JWT_SECRET_KEY'])
+        return None
+```
+
+이렇게 변경을 하게 되면 views.py의 main 페이지 부분은 다음과 같이 이쁘게 변환이 가능하다.
+
+```python
+def RenderMainPage(request):
+    tk = Token(request.COOKIES.get('token'))
+    tk_jwt_value = tk.decode_jwt()
+    if tk_jwt_value is not None:
+        username = tk_jwt_value['username']
+        user_api = APIAboutUser(tk_jwt_value['username'], tk.token)
+        user_profile = user_api.get_user_profile()
+        choice = user_api.get_user_preference()
+        date_info, food_count = user_api.get_user_foodcount()
+        return render(request, 'main.html',
+                      {'username': username, 'foodcount': food_count, 'dateinfo': date_info,
+                       'choice': choice, 'user_profile': user_profile})
+    else:
+        response = HttpResponseRedirect('/user/login')
+        response.delete_cookie('token')
+        return response
+```
+
+### food app 리팩토링
+
+food app도 마찬가지로 requests를 통해 api와 통신하는 부분을 apis.py로 분리하였다.
+
+```python
+import requests
+import json
+
+
+class APIAboutFood:
+    def __init__(self, username, foodname, tk):
+        self.username = username
+        self.foodname = foodname
+        self.tk = tk
+
+    def get_food_detail(self):
+        url = "http://localhost:8000/api/food/"
+        r = requests.get(url + self.foodname, headers={'Authorization': 'JWT ' + self.tk})
+        if r.status_code == 200:
+            res = r.json()
+        else:
+            res = None
+        return res
+
+    def get_user_food(self):
+        url = "http://localhost:8000/api/food/user/"
+        r = requests.post(url + self.username, data={'foodname': self.foodname}, headers={'Authorization': 'JWT ' + self.tk})
+        if r.status_code == 200:
+            res = json.loads(r.json())
+        else:
+            res = {'nope': 1}
+        return res
+
+    def get_user_food_by_date(self, date):
+        url = "http://localhost:8000/api/food/date/"
+        r = requests.get(url + self.username + '/' + date, headers={'Authorization': 'JWT ' + self.tk})
+        if r.status_code == 200:
+            res = r.json()
+        else:
+            res = dict()
+            res['B'] = res['L'] = res['D'] = '-'
+        return res
+
+    def update_user_food_by_date(self, requested_data):
+        url = "http://localhost:8000/api/food/date/"
+        r = requests.post(url + self.username, data=requested_data, headers={'Authorization': 'JWT ' + self.tk})
+        if r.status_code == 200:
+            res = '요청이 정상적으로 반영되었습니다.'
+        else:
+            res = '정보를 다시 확인해주세요.'
+        return res
+
+    def delete_user_food_by_date(self, date, mealkind):
+        url = "http://localhost:8000/api/food/date/"
+        r = requests.delete(url + self.username + '/' + date + '/' + mealkind, headers={'Authorization': 'JWT ' + self.tk})
+        if r.status_code == 200:
+            res = '요청이 정상적으로 반영되었습니다.'
+        else:
+            res = '정보를 다시 확인해주세요.'
+        return res
+
+```
+
+그에 따라 아래와 같이 좀 더 가독성이 좋아진 views.py를 마주하게 된다.
+
+```python
+def RenderFoodPage(request, foodname):
+    tk = Token(request.COOKIES.get('token'))
+    tk_jwt_value = tk.decode_jwt()
+    if tk_jwt_value is not None:
+        username = tk_jwt_value['username']
+        food_api = APIAboutFood(username, foodname, tk.token)
+        user_api = APIAboutUser(username, tk)
+        chart = food_api.get_user_food()
+        user_profile = user_api.get_user_profile()
+        menu = food_api.get_food_detail()
+        return render(request, 'foodmenu.html',
+                      {'username': username, 'menu': menu, 'chart': chart, 'user_profile': user_profile})
+    else:
+        response = HttpResponseRedirect('/user/login')
+        response.delete_cookie('token')
+        return response
+```
+
+### api app 리팩토링
+
+마지막으로 api app의 경우 accounts.py, foods.py를 세부적으로 관리하여 각각 해당 앱의 Model과 관련된 작업을 하는 부분을 분리하였다.
+
+```python
+from django.contrib.auth.hashers import check_password
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_text
+from django.template.loader import render_to_string
+from .tokens import account_activation_token
+from django.core.mail import EmailMessage
+from user.models import Account
+
+
+class UserAccount:
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+        self.account = None
+
+    def is_account_status_ok(self):
+        if self.account.status == 'O':
+            return True
+        else:
+            return False
+
+    def is_account_available(self):
+        try:
+            self.account = Account.objects.get(username=self.username)
+            if self.is_account_status_ok():
+                return True
+            else:
+                return False
+        except:
+            return False
+
+    def is_password_correct(self):
+        if self.is_account_available() and check_password(self.password, self.account.password):
+            return True
+        else:
+            return False
+
+    def already_have_username(self):
+        try:
+            res = Account.objects.get(username=self.username)
+            return True
+        except:
+            return False
+
+    def already_have_email(self, email):
+        try:
+            res = Account.objects.get(email=email)
+            return True
+        except:
+            return False
+
+    def get_account_by_pk(self, uidb64):
+        uid = force_text(urlsafe_base64_decode(uidb64))
+        res = Account.objects.get(pk=uid)
+        self.account = res
+        return res
+
+    def get_account(self):
+        res = Account.objects.get(username=self.username)
+        return res
+
+    def check_account_activation(self, token):
+        if self.account is None:
+            return False
+        elif account_activation_token.check_token(self.account, token):
+            self.account.status = 'O'
+            self.account.active = True
+            self.account.is_active = True
+            self.account.save()
+            return True
+        return False
+
+    def get_email_link(self):
+        user = self.get_account()
+        message = render_to_string('activate.html', {
+            'domain': 'localhost:8000',
+            'username': self.username,
+            'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+            'token': account_activation_token.make_token(user)
+        })
+        return message
+
+    def send_email(self, email):
+        mail_subject = 'eaten-Away 이메일 인증'
+        to_email = email
+        message = self.get_email_link()
+        email = EmailMessage(mail_subject, message, to=[to_email])
+        email.send()
+```
+
+이와 같이 분리함으로써 views.py에서 중복되는 코드들을 줄일 수 있을 뿐더러 가독성도 향상되었다.
+
+```python
+"""
+GET : user/apis.py -> get_user_preference (/api/food/preference/<str:username>)
+용도  : 특정 기간 내의 사용자의 음식 리스트를 조회하여 추천 메뉴 7개를 선정함
+"""
+class APIForUserFoodChoice(APIView):
+
+    def get(self, request, username):
+        UserFood = DailyFood(username)
+        foodlist = UserFood.get_user_food_with_day(9)
+
+        if not foodlist.exists():
+            return Response(status=HTTP_400_BAD_REQUEST)
+
+        else:
+            res = UserFood.get_preference()
+            return Response(res, status=HTTP_200_OK)
+```
+
+사용자가 먹은 음식 리스트를 토대로 7가지의 음식을 추천해주는 코드는 무려 다음과 같이 8줄 내외로 줄어들었다. 
+
+### JWT API 권한 설정
+
+예전에 settings.py에서 코드를 다음과 같이 변경하였었다.
+
+```python
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+}
+```
+
+하지만 개발하는 과정에서는 테스트를 위해서 권한을 AllowAny로 뒀었는데 보안성 강화를 위해서 유저가 로그인 후에 사용할 수 있는 기능을 제공하는 API부분에 JWT가 필요하도록 설정해주자. 이미 위의 코드에 등장하지만 headers를 다음과 같이 추가해주면 된다.
+
+```python
+def get_food_detail(self):
+    url = "http://localhost:8000/api/food/"
+    r = requests.get(url + self.foodname, headers={'Authorization': 'JWT ' + self.tk})
+    if r.status_code == 200:
+        res = r.json()
+    else:
+        res = None
+    return res
+```        
+
+Authorization 부분에 JWT + token 값을 추가해주면 성공할 경우에는 정상적인 API 기능이 수행되고 잘못된 값일 경우 401이 status_code로 돌아오게 된다. 이를 통해 로그인 된 사용자의 JWT 토큰을 검증하여 API가 기능을 하게 되었다.
+
+
+### GITHUB link
+
+대댓글 기능을 구현하지 않긴 하였지만 해당 서비스에서 굳이 필요한 기능이라고 판단되지 않았기 때문에 과감히 생략하였다. 아래의 링크를 통해 전체 소스 코드를 확인가능하다.
+(url에 대한 부분은 완전하게 설정을 하지 않았고, DEBUG 모드도 True인 상태이다.)
+
+[eaten-Away 결과물](https://butter-shower.tistory.com/49?category=718374)
+
+
 
