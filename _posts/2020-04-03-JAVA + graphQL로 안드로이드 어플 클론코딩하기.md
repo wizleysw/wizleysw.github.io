@@ -29,9 +29,9 @@ toc : true
 
 클론 코딩의 주제로 정한 어플은 "세줄일기"라는 어플이다.
 
-[세줄 일기](https://play.google.com/store/apps/details?id=kr.co.dany.threelinediary&hl=ko)
+[인스타그램](https://play.google.com/store/apps/details?id=com.instagram.android&hl=ko)
 
-이 어플의 경우 사용자가 하루동안 있었던 일을 한 장의 사진과 세 줄 내외의 글로 남기는 어플인데 예전부터 다이어리 관련된 어플을 토이 프로젝트로 생각을 하고 있었고, 어플의 구성이 마음에 쏙 들었다. 그래서 최대한 해당 어플과 비슷한 방식으로 구현하도록 노력을 해볼 것이다. 
+원래 하고자 하는 다른 어플이 있었는데, 메일로 문의한 내용에 대한 답변이 오지 않아 부득이하게 변경을 하게 되었다. 많은 사람들이 클론 코딩 주제로 인스타그램을 선정하였는데 nodejs, react가 아닌 JAVA를 토대로 비슷하게 흉내내보는 토이 프로젝트로 진행하기로 하였다.
 
 ## JAVA 핵심 정리
 
