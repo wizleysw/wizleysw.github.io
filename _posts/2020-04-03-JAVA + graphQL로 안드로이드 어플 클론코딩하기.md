@@ -354,4 +354,26 @@ manifest 부분에서 MainActivity가 가지고 있던 intent filter를 IntroAct
 
 ![introactivity](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/introactivity.png)
 
+### 런처 아이콘 변경
+
+기본 어플리케이션의 아이콘이 설정되어 있지 않은 상태이기 때문에 이를 설정하기 위해 아래의 블로그를 참고하였다.
+
+[Android 런처 아이콘 변경하기](https://webnautes.tistory.com/1306)
+
+Image Asset을 추가한 뒤 manifest를 수정해주면 된다.
+
+```xml
+<application
+    android:allowBackup="true"
+    android:icon="@mipmap/ic_launcher_aintstagram"
+    android:label="@string/app_name"
+    android:roundIcon="@mipmap/ic_launcher_aintstagram_round"
+    android:supportsRtl="true"
+    android:theme="@style/AppTheme">
+```
+
+xml파일이 ic_launcher_aintstagram이기 때문에 icon과 roundIcon을 다음과 같이 변경해주면 아래와 같이 변경되는 것을 확인할 수 있다.
+
+![icon](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/icon.png)
+
 
