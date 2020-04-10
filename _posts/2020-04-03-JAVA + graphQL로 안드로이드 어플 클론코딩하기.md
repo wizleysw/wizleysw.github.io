@@ -208,3 +208,150 @@ r이 Repairable 타입이기 때문에 인터페이스에 정의된 멤버만이
 
 또 다른 점에서 인터페이스가 편리한것이 클래스 A와 B가 A->B의 형태를 가지고 있을 경우에 한 쪽에 대한 내용을 수정할 경우 두 클래스 내부의 관련된 코드를 모두 수정해야 된다는 특징이 있다. 이런 부분에서 인터페이스를 통해 접근을 하게 되면 둘 중 하나에서 변경이 필요한 경우 나머지 하나를 변경하지 않고 인터페이스 내부의 코드만을 변경하면 된다는 장점이 있다. 즉 A->I->B의 형태가 되는 것이다.
 
+## Settings
+
+개발을 진행하기 전에 안드로이드 관련 기초적인 내용들에 대한 많은 공부를 하였다. 안드로이드 역시 Django와 비슷하게 꽤 자세한 document가 있다. 
+
+[안드로이드 개발자 문서](https://developer.android.com/guide/components/intents-filters?hl=ko)
+
+공부한 내용들에 대한 키워드를 간략히 남겨보자면 안드로이드 레이아웃에 대한 개념, 라이프 사이클, 4가지 구성 요소, 액티비티 스택, 프레그먼트 등이 있었다. 
+
+개발의 순서에 대한 설명은 아래의 링크를 참고하기로 하였다.
+
+[어플리케이션 제작 순서](https://devcompass.co.kr/%EC%95%B1-%EC%A0%9C%EC%9E%91/)
+
+### AndroidStudio
+
+안드로이드 개발은 안드로이드 스튜디오를 사용하는 것이 가장 편리해보인다. qemu 에뮬레이터도 있을 뿐 아니라 pycharm과 거의 동일한 IDE 기능을 가지고 있다. 거기다가 layout을 쉽게 그릴 수 있도록 도와주니 더욱 좋다. 
+
+안드로이드 개발을 위해서는 먼저 java를 사용하기 위한 jdk를 설치해야 되며 그 후 안드로이드 스튜디오를 설치하면 dependency가 대부분 설치가 된다. 그리고 이는 brew를 사용하면 편리하게 설치가 가능하다.
+
+```console
+brew cask install android-studio
+```
+
+
+### Layout 만들기
+
+안드로이드의 구조에서 res 내부의 Layout은 Django의 template과 같은 기능을 한다. xml로 설계된 button, text 등에 대한 요소들을 java 파일에서 가져와 사용하는 방식으로 구현된다. 
+
+```java
+public class MainActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+    }
+}
+```
+
+기본 코드의 MainActivity를 보면 onCreate 부분에서 ContentView로 layout을 가져와서 뿌려준다. 이를 통해 activity_main.xml 파일의 내용이 해석되 렌더링 된다.
+
+layout을 만들기 위해 인스타그램 어플이 가지고 있는 여러 페이지들에 대한 디자인을 따오는 작업이 필요하다. 즉 화면 정의서를 만들어야 되는데 이는 화면의 구조와 표시될 내용 및 기능에 대한 설명을 적어놓은 와이어 프레임을 작성해야 된다. 역시나 아주 좋은 프로그램이 존재했다. 바로 카카오에서 만든 Oven이다.
+
+[Oven](https://ovenapp.io/)
+
+웹에서 간단하게 와이어 프레임을 작성가능하다. 이제 해야될 일은 레이아웃을 따보는 것이다. 클론 프로젝트의 장점은 잘 만들어진 어플을 디자인 구현에 대한 적은 고민으로 구현해볼 수 있다는 점이다. 아마 혼자 디자인을 한다면 올해안에 끝을 내지 못할수도 있을 것 같다. 
+
+[인스타 메인 페이지 와이어 프레임](https://ovenapp.io/project/wBMk8RazGBK2TMSnzpL0Ah5MpadQfXWU#1wazS)
+
+대충 모양에 대해서 흉내를 내보았다. 이런 식으로 골격과 사이즈를 재서 디자인을 진행하는 것 같다.
+
+## Android Side 개발
+
+이제 하나씩 시작을 해보도록 하자. 프로그램의 전체적인 흐름을 대략적으로 살펴보았다. 테스트를 위해서는 백엔드쪽 DB에 대한 설계가 좀 필요할 것 같긴한데 프로그램이 시작되면서 흐르는 루틴에 따라 개발을 해보기로 하였다.
+
+### IntroActivity
+
+많은 어플리케이션이 실행이 되면 로고를 화면의 중간에 몇초간 띄웠다가 MainActivity를 띄우게 된다. 이를 위한 작업을 IntroActivity로 보통 명명한다. 
+
+[안드로이드 intro 화면 만들기](https://boheeee.tistory.com/4)
+
+위의 사이트에 IntroActivity를 구현한 내용이 있다. 위의 저자의 경우 LinearLayout을 사용하여 구현하였는데 나의 경우 ConstraintLayout을 사용하여 구현하였다.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    tools:context=".IntroActivity">
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_top"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/logo"
+        app:layout_constraintGuide_begin="100dp"/>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/logo"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintGuide_end="100dp"/>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_left"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/guideline_top"
+        app:layout_constraintBottom_toTopOf="@id/guideline_bottom"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@id/logo"
+        app:layout_constraintGuide_begin="30dp"/>
+
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_right"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/guideline_top"
+        app:layout_constraintBottom_toTopOf="@id/guideline_bottom"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintLeft_toRightOf="@id/logo"
+        app:layout_constraintGuide_end="30dp"/>
+
+    <ImageView
+        android:id="@+id/logo"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:src="@drawable/aintstagram"
+        app:layout_constraintBottom_toTopOf="@id/guideline_bottom"
+        app:layout_constraintTop_toBottomOf="@id/guideline_top"
+        app:layout_constraintLeft_toRightOf="@id/guideline_left"
+        app:layout_constraintRight_toLeftOf="@id/guideline_right"/>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+```
+
+Guideline을 활용하여 레이아웃을 짜보았는데 위, 아래, 왼쪽, 오른쪽에 해당하는 가이드라인을 통해 중간부분에 위치하도록 하였다. 그리고 비율에 따라 같은 위치에 존재하도록 dp로 width와 height를 주었다.
+
+```xml
+<activity android:name=".IntroActivity">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>
+<activity android:name=".MainActivity">
+</activity>
+```
+
+manifest 부분에서 MainActivity가 가지고 있던 intent filter를 IntroActivity로 옮겨주었고 나머지 내용은 블로그와 동일하게 작성하였다. 이를 통해 어플이 실행되면 IntroActivity가 호출이 되고 쓰레드가 호출되어 handler의 결과에 따라 MainActivity로 이동하도록 하였다.
+
+아, 참! 어플의 이름은 aintstagram인데 aint + instagram의 합성어이다. 말 그대로 가짜 인스타그램이라는 의미를 지니고 있다. 그래서 로고는 살짝 모양을 변형하여 대충 쓱 그려보았다. 이를 통해 실행되는 IntroActivity의 모습은 다음과 같다.
+
+![introactivity](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/introactivity.png)
+
+
