@@ -376,4 +376,12 @@ xml파일이 ic_launcher_aintstagram이기 때문에 icon과 roundIcon을 다음
 
 ![icon](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/icon.png)
 
+### 액션바 숨기기
+
+Empty Activity를 생성해도 윗 부분에 액션바가 존재한다. 실제 어플에서는 해당 부분이 존재하지 않기 때문에 이를 지워주고 싶었다. 방법은 간단했다. manifest에서 theme을 다음과 같이 변경해주면 된다.
+
+```xml
+android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+```
+
 
