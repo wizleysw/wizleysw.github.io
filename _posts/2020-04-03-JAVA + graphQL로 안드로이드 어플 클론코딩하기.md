@@ -230,6 +230,99 @@ r이 Repairable 타입이기 때문에 인터페이스에 정의된 멤버만이
 brew cask install android-studio
 ```
 
+### Docker로 graphql-django 생성하기
+
+이번에는 Django를 graphql과 엮어보기로 했다. 이를 위해서 Dockerfile을 아래와 같이 작성하였다.
+
+```console
+FROM python:3
+
+MAINTAINER Wizley <wizley@kakao.com>
+
+WORKDIR /code
+COPY ./requirements.txt /code
+
+RUN pip3 install -r ./requirements.txt
+```
+
+그리고 requirements.txt에는 graphql 관련 라이브러리가 추가되었다.
+
+```console
+aniso8601==7.0.0
+asgiref==3.2.3
+attrs==19.3.0
+coverage==5.0.3
+Django==3.0.3
+django-cors-headers==3.2.1
+graphene==2.1.8
+graphene-django==2.9.1
+graphql-core==2.3.1
+graphql-relay==2.0.1
+more-itertools==8.2.0
+packaging==20.1
+pluggy==0.13.1
+promise==2.3
+py==1.8.1
+PyJWT==1.7.1
+pyparsing==2.4.6
+pytest==5.3.5
+pytest-cov==2.8.1
+pytz==2019.3
+Rx==1.6.1
+singledispatch==3.4.0.3
+six==1.14.0
+sqlparse==0.3.0
+wcwidth==0.1.8
+```
+
+직접 설치를 하게 된다면 아래와 같은 명령어로 설치를 진행하면 된다.
+
+```console
+pip install graphene-django
+```
+
+이제 도커 이미지를 생성할 차례이다. graphql-django라는 이름으로 생성하기로 하였다. 안드로이드를 자바로 짜기 때문에 Spring에 붙히면 어떨까라는 고민을 잠깐 했었지만 이번 프로젝트의 몸통은 안드로이드 개발에 두고 있기 때문에 전에 개발에 사용했던 Django를 사용하기로 했다.
+
+```console
+Wizley:~/git/aintstagram/backend_api # docker build --tag graphql-django:1.0 .
+```
+
+명령어를 통해 확인을 해보니 잘 설치 된 것을 확인 가능하다.
+
+```console
+Wizley:~/git/aintstagram/backend_api # docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+graphql-django      1.0                 a5fe92f02b0f        6 seconds ago       984MB
+django              1.0                 0472bb664767        6 weeks ago         981MB
+ubuntu              latest              72300a873c2c        7 weeks ago         64.2MB
+phpmysqli           1.0                 b5cd17f37d99        7 weeks ago         83.9MB
+python              3                   efdecc2e377a        2 months ago        933MB
+nginx               1.17                2073e0bcb60e        2 months ago        127MB
+mysql               8.0.19              791b6e40940c        2 months ago        465MB
+```
+
+이제 컴포즈를 올려서 실행을 시켜보도록 하겠다. 
+
+```
+Wizley:~/git/aintstagram/backend_api # cat docker-compose.yml
+version: '3'
+
+services:
+ graphql:
+  container_name: aintstagram
+  image: graphql-django:1.0
+  environment:
+    - DJANGO_DEBUG=true
+  volumes:
+    - ./code:/code
+  ports:
+    - "8000:8000"
+  tty: true
+  command: python3 ./backend_aintstagram/manage.py runserver 0:8000
+```
+
+정상적으로 잘 올라간다. Settings.py에서 SECRET_KEY만 슬쩍 빼주면 아주 기본적인 세팅은 끝이 난 것 같다. 
+
 
 ### Layout 만들기
 
