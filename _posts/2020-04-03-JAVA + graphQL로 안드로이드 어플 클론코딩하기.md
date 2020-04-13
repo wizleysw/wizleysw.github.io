@@ -384,7 +384,7 @@ Empty Activity를 생성해도 윗 부분에 액션바가 존재한다. 실제 �
 android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 ```
 
-### 메인 엑티비티 카메라 버튼 구현하기 
+### 카메라 인텐트 구현하기 
 
 메인 엑티비티로 칭하는 페이지는 인스타그램의 로딩이 완료되면 나오는 창이다. 레이아웃을 짜야했는데 어떤 식으로 짜야될지에 대해서 정말 많은 고민을 하였다. 일단은 직관적인 방식으로 진행하기로 하였고 constraint layout을 활용하여 버튼에 대한 뷰를 만들었다. 그리고 대충 그린 이미지로 ImageButton을 채워서 뷰를 이렇게 구성해주었다.
 
@@ -620,3 +620,68 @@ public class MainActivity extends AppCompatActivity{
 ```
 
 setBtn이라는 함수를 생성하였는데 이 함수는 버튼들에 대한 초기화를 진행할 것이다. 함수가 호출이 되면 btn_camera라는 ImageButton이 생성되는데 이 버튼에 OnClickListener를 달아줄 것이다. OnclickListener를 정의해줄 Listener라는 변수를 생성하는데 이 변수는 내부에서 onClick을 오버라이딩해서 해당 이벤트 발생시의 동작을 재정의해준다. getId를 통해 어떤 버튼이 클릭 되었는지를 판별한 뒤 해당 버튼에 따라 case문을 수행해주는 것이다. button_to_camera가 onClick되면 takePictureIntent를 실행시켜줄 것인데 해당 인텐트는 카메라 작업을 위한 사전정의된 인텐트이다. 하지만 안드로이드 특정 버전 이상부터는 해당 기능에 대한 퍼미션 검사를 해주지 않으면 Permission 관련 에러가 발생하다. 그래서 이를 체크하기 위해서 requestPermission을 위와같이 진행해주어야 된다. 이렇게 코드를 작성하면 처음 카메라 버튼이 클릭되면 권한에 대한 요청이 수행되고 그 후에는 카메라 기능이 정상적으로 작동하게 된다. 
+
+자 이번에는 받아서 처리하는 부분을 설계해야되는데 Intent에 대한 결과를 받아오는 onActivityResult을 오버라이딩 해서 구현해 주어야 된다.
+
+```java
+@Override
+protected void onActivityResult(int requestCode, int resultCode, Intent data){
+    super.onActivityResult(requestCode, resultCode, data);
+    if(requestCode == REQUEST_IMAGE_CAPTRUE && resultCode == RESULT_OK && data.hasExtra("data")) {
+        Bitmap bitmap = (Bitmap) data.getExtras().get("data");
+    }
+}
+```
+
+여기서 엄청난 시간을 낭비하였는데 startActivityForResult로 넘겨주는 인터넷 상의 많은 코드들이 bitmap을 가져오는 getExtras()에서 null 문제가 발생하였다. 삽질한 결과 activity를 넘겨주기 전에 putExtra로 URI 정보를 넘겨줄 경우에 이런 문제가 발생하였다. 후.. 어쨌든 지금 결과를 받아오는 곳에서 bitmap으로 찍은 사진에 대한 정보를 가져오는 것 까지 확인할 수 있었다. 또 그 과정에서 adb를 통해서 qemu내부에 접속을 시도하였는데 root권한을 획득하는 것이 안되었다. 이것도 qemu 안드 에뮬레이터 중에서 Google Play와 연관된 이미지를 사용하면 안되는 것이었다. 이를 위해서 다른 버전의 에뮬레이터를 추가로 설치하고서야 adb로 접속하여 내부 구조를 확인할 수 있었다. adb의 경우 android-studio의 sdk가 설치된 파일로 가서 platform-tools 폴더 내부에 설치되어있어서 따로 설치를 할 필요가 없다. 
+
+### 갤러리 인텐트 구현하기
+
+카메라와 비슷한 방식으로 구현이 가능하다.
+
+```java
+View.OnClickListener Listener = new View.OnClickListener() {
+    @Override
+    public void onClick(View v) {
+        int permissionCheck;
+        switch (v.getId()) {
+            case R.id.button_to_camera:
+                permissionCheck = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA);
+                if (permissionCheck == PackageManager.PERMISSION_DENIED) {
+                    ActivityCompat.requestPermissions(MainActivity.this, PERMISSIONS, 0);
+                } else {
+                    Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                    if (intent.resolveActivity(getPackageManager()) != null) {
+                        startActivityForResult(intent, REQUEST_IMAGE_CAPTRUE);
+                    }
+                }
+                break;
+
+            case R.id.button_to_add:
+                permissionCheck = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_EXTERNAL_STORAGE);
+                if (permissionCheck == PackageManager.PERMISSION_DENIED) {
+                    ActivityCompat.requestPermissions(MainActivity.this, PERMISSIONS, 0);
+                } else {
+                    Intent intent = new Intent();
+                    intent.setAction(Intent.ACTION_GET_CONTENT);
+                    intent.setData(MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                    intent.setType("image/*");
+                    startActivityForResult(intent, REQUEST_TAKE_ALBUM);
+                }
+                break;
+        }
+    }
+};
+
+```
+
+마찬가지로 정보를 가져오는 것이기 때문에 그에 상응하는 권한을 Manifest에 정의를 해주어야 되며 User로 부터 동의를 구해야 된다. 
+
+```xml
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+```
+
+이렇게 해주면 갤러리로 부터 사진을 가져오는 것이 가능하다.
+
+![gallery](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/gallery.png)
