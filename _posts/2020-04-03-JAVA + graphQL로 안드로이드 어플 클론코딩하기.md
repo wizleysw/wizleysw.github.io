@@ -384,4 +384,239 @@ Empty Activity를 생성해도 윗 부분에 액션바가 존재한다. 실제 �
 android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 ```
 
+### 메인 엑티비티 카메라 버튼 구현하기 
 
+메인 엑티비티로 칭하는 페이지는 인스타그램의 로딩이 완료되면 나오는 창이다. 레이아웃을 짜야했는데 어떤 식으로 짜야될지에 대해서 정말 많은 고민을 하였다. 일단은 직관적인 방식으로 진행하기로 하였고 constraint layout을 활용하여 버튼에 대한 뷰를 만들었다. 그리고 대충 그린 이미지로 ImageButton을 채워서 뷰를 이렇게 구성해주었다.
+
+![main_1](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/main_1.png)
+
+이제 버튼이 동작을 하도록 구현할 것인데 Intent를 활용하여 좌측 상단의 카메라 버튼을 클릭하면 카메라 창이 뜨도록 할 것이다. 이를 위해서는 여러가지 설정이 필요하다. 일단 만든 레이아웃은 다음과 같다.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_top_menu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintGuide_begin="60dp"/>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_bottom_menu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintGuide_end="60dp"/>
+
+    <ImageButton
+        android:id="@+id/button_to_camera"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintVertical_weight="1"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/guideline_top_menu"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@id/button_logo"
+        android:src="@drawable/camera"
+        android:scaleType="fitCenter"
+        android:background="@android:color/background_dark"
+        tools:ignore="MissingConstraints" />
+
+    <Button
+        android:id="@+id/button_logo"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintVertical_weight="3"
+        app:layout_constraintHorizontal_weight="3"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/guideline_top_menu"
+        app:layout_constraintLeft_toRightOf="@id/button_to_camera"
+        app:layout_constraintRight_toLeftOf="@id/button_to_chat"
+        android:text="Aintstagram"
+        android:textColor="@android:color/white"
+        android:textStyle="italic"
+        android:background="@android:color/background_dark"
+        tools:ignore="MissingConstraints" />
+
+    <ImageButton
+        android:id="@+id/button_to_chat"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintVertical_weight="1"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/guideline_top_menu"
+        app:layout_constraintLeft_toRightOf="@id/button_logo"
+        app:layout_constraintRight_toRightOf="parent"
+        android:src="@drawable/sms"
+        android:scaleType="fitCenter"
+        android:background="@android:color/background_dark"
+        tools:ignore="MissingConstraints" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/story"
+        android:layout_height="100dp"
+        android:layout_width="match_parent"
+        app:layout_constraintTop_toTopOf="@id/guideline_top_menu"
+        app:layout_constraintBottom_toTopOf="@id/scroll"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        android:scrollbars="horizontal"
+        tools:ignore="MissingConstraints" />
+
+    <ImageButton
+        android:id="@+id/button_to_home"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintVertical_weight="1"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintTop_toBottomOf="@id/guideline_bottom_menu"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@id/button_to_search"
+        android:src="@drawable/home"
+        android:scaleType="fitCenter"
+        android:background="@android:color/background_dark"
+        tools:ignore="MissingConstraints" />
+
+    <ImageButton
+        android:id="@+id/button_to_search"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintVertical_weight="1"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintTop_toBottomOf="@id/guideline_bottom_menu"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toRightOf="@id/button_to_home"
+        app:layout_constraintRight_toLeftOf="@id/button_to_add"
+        android:src="@drawable/search"
+        android:scaleType="fitCenter"
+        android:background="@android:color/background_dark"
+        tools:ignore="MissingConstraints" />
+
+    <ImageButton
+        android:id="@+id/button_to_add"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintVertical_weight="1"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintTop_toBottomOf="@id/guideline_bottom_menu"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toRightOf="@id/button_to_search"
+        app:layout_constraintRight_toLeftOf="@id/button_to_history"
+        android:src="@drawable/add"
+        android:scaleType="fitCenter"
+        android:background="@android:color/background_dark"
+        tools:ignore="MissingConstraints" />
+
+    <ImageButton
+        android:id="@+id/button_to_history"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintVertical_weight="1"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintTop_toBottomOf="@id/guideline_bottom_menu"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toRightOf="@id/button_to_add"
+        app:layout_constraintRight_toLeftOf="@id/button_to_info"
+        android:src="@drawable/heart"
+        android:scaleType="fitCenter"
+        android:background="@android:color/background_dark"
+        tools:ignore="MissingConstraints" />
+
+    <ImageButton
+        android:id="@+id/button_to_info"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintVertical_weight="1"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintTop_toBottomOf="@id/guideline_bottom_menu"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toRightOf="@id/button_to_history"
+        app:layout_constraintRight_toRightOf="parent"
+        android:src="@drawable/userinfo"
+        android:scaleType="fitCenter"
+        android:background="@android:color/background_dark"
+        tools:ignore="MissingConstraints" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/scroll"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/story"
+        app:layout_constraintBottom_toBottomOf="@id/guideline_bottom_menu"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:scrollbars="vertical"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+```
+
+아직 수정의 필요성이 보이긴 하지만 ImageButton과 RecyclerView를 활용하여 constraint Layout을 짜보았다. 카메라 기능을 활용하기 위해서는 Manifest에 아래의 조건을 추가해주어야 된다.
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-feature android:name="android.hardware.camera" android:required="true" />
+```
+
+이제 MainActivity에서 버튼에 대한 부분을 처리해주어야 되는데 Oncreate부분에 이를 작성할 것이다. 
+
+```java
+
+public class MainActivity extends AppCompatActivity{
+    private static final int REQUEST_IMAGE_CAPTRUE = 1;
+    private ImageButton btn_camera;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        this.setBtn();
+
+    }
+
+    public void setBtn(){
+        btn_camera = (ImageButton)findViewById(R.id.button_to_camera);
+
+        View.OnClickListener Listener = new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                switch (v.getId()) {
+                    case R.id.button_to_camera:
+                        int permissionCheck = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA);
+                        if(permissionCheck == PackageManager.PERMISSION_DENIED){
+                            ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.CAMERA},0);
+                        } else {
+                            Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                            if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+                                startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTRUE);
+                            }
+                        }
+                        break;
+                    case R.id.button_to_home:
+                        break;
+                }
+            }
+        };
+
+        btn_camera.setOnClickListener(Listener);
+    }
+}
+```
+
+setBtn이라는 함수를 생성하였는데 이 함수는 버튼들에 대한 초기화를 진행할 것이다. 함수가 호출이 되면 btn_camera라는 ImageButton이 생성되는데 이 버튼에 OnClickListener를 달아줄 것이다. OnclickListener를 정의해줄 Listener라는 변수를 생성하는데 이 변수는 내부에서 onClick을 오버라이딩해서 해당 이벤트 발생시의 동작을 재정의해준다. getId를 통해 어떤 버튼이 클릭 되었는지를 판별한 뒤 해당 버튼에 따라 case문을 수행해주는 것이다. button_to_camera가 onClick되면 takePictureIntent를 실행시켜줄 것인데 해당 인텐트는 카메라 작업을 위한 사전정의된 인텐트이다. 하지만 안드로이드 특정 버전 이상부터는 해당 기능에 대한 퍼미션 검사를 해주지 않으면 Permission 관련 에러가 발생하다. 그래서 이를 체크하기 위해서 requestPermission을 위와같이 진행해주어야 된다. 이렇게 코드를 작성하면 처음 카메라 버튼이 클릭되면 권한에 대한 요청이 수행되고 그 후에는 카메라 기능이 정상적으로 작동하게 된다. 
