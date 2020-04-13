@@ -323,6 +323,87 @@ services:
 
 정상적으로 잘 올라간다. Settings.py에서 SECRET_KEY만 슬쩍 빼주면 아주 기본적인 세팅은 끝이 난 것 같다. 
 
+이제 graphql이 제대로 작동하는지 테스트를 위해 아래와 같이 좋은 링크 두개를 찾을 수 있었다.
+
+[Integrate GraphQL into your Django project](https://medium.com/@zoejoyuliao/django-graphql-react-1-integrate-graphql-into-your-django-project-ff51237bb5d9)
+
+[Python으로 GraphQL 서버 구현](https://jonnung.dev/graphql/2019/08/05/python-graphql-graphene-tutorial/)
+
+```python
+INSTALLED_APPS = [
+    ...
+    'graphene_django',
+    'api',
+]
+```
+
+api라는 app을 하나 생성하고 INSTALLED_APPS에 추가해주었따. 그 후 메인의 url을 통해 graphql에 접근할 수 있도록 링크를 하나 설정해주었다. 
+(이 경우에 csrf_exempt를 설정해주지 않으면 지금 상황에서는 400에러가 뜨게 된다.)
+
+```python
+from django.contrib import admin
+from django.urls import path
+from django.views.decorators.csrf import csrf_exempt
+from graphene_django.views import GraphQLView
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('graphql/', csrf_exempt(GraphQLView.as_view(graphiql=True))),
+]
+```
+
+그 후 test에 사용할 UserModel을 api/models.py에 생성한다.
+
+```python
+from django.db import models
+
+
+class UserModel(models.Model):
+    name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+```
+
+그리고 통신을 위해 사용할 부분을 api/schema.py에 추가해준다.
+
+```python
+import graphene
+from graphene_django import DjangoObjectType
+
+from api.models import UserModel
+
+
+class UserType(DjangoObjectType):
+    class Meta:
+        model = UserModel
+
+
+class Query(graphene.ObjectType):
+    users = graphene.List(UserType)
+
+    def resolve_users(self, info):
+        return UserModel.objects.all()
+
+
+schema = graphene.Schema(query=Query)
+```
+
+마지막으로 schema를 settings.py에 추가해주면 된다.
+
+```python
+# Graphql
+
+GRAPHENE ={
+    'SCHEMA': 'api.schema.schema'
+}
+```
+
+이제 localhost:8000/graphql/ 링크로 접속하면 아래와 같은 페이지를 확인할 수 있다.
+
+
+![graphql_init](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/graphql_init.png)
+
+이렇게 graphql을 사용하기 위한 환경구성을 마무리하였다!
+
 
 ### Layout 만들기
 
