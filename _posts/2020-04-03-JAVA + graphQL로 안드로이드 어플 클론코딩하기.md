@@ -1116,8 +1116,65 @@ at 3f5c6005c0954ba8a11e315b702a5442.xml
 </map>
 ```
 
-adb로 접속해서 확인해보면 Token에 대한 정보가 로컬 저장소에 정상적으로 저장된 것을 확인할 수 있었다.
+adb로 접속해서 확인해보면 Token에 대한 정보가 로컬 저장소에 정상적으로 저장된 것을 확인할 수 있었다. 여기서 조금 더 나아가 수정을 해보자. 현재까지 있던 문제로는 introActivity가 activityStack에 남아있다는 점과 MainActivity로 넘어간다는 점, 또 그리고 LoginActivity를 세션이 유지되어 있는 동안에는 굳이 띄울필요가 없다는 점을 들 수 있겠다. 해당 처리를 위해서 IntroActivity 부분과 IntroThread를 낭낭히 수정해보자.
 
+```java
+package com.ssg.aintstagram;
+
+import android.os.Message;
+import android.os.Handler;
+import com.kakao.auth.Session;
+
+public class IntroThread extends Thread {
+    private Handler handler;
+
+    public IntroThread(Handler handler){
+        this.handler = handler;
+    }
+
+    @Override
+    public void run(){
+        Message msg = new Message();
+
+        try{
+            Thread.sleep(2000);
+
+            if(Session.getCurrentSession().isOpened()){
+                msg.what = 1;
+            }
+            else{
+                msg.what = 2;
+            }
+            handler.sendEmptyMessage(msg.what);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+Introthread는 잠시 로고를 띄워주는 역할을 수행했었는데 한 가지 작업을 더 추가하였다.
+
+[kakao-api doc](https://developers.kakao.com/sdk/reference/android-legacy/release/index.html)
+
+위의 사이트의 Session 라이브러리를 보면 isOpened라는 메소드가 있다. 해당 메소드를 호출하여 세션에 대한 정보가 있는지를 확인한 뒤 연결되어 있는 상태이면 1을 아닐 경우 2를 넘겨준다.
+
+```java
+@Override
+public void handleMessage(Message msg){
+    if(msg.what == 1){
+        Intent intent = new Intent(IntroActivity.this, MainActivity.class);
+        startActivity(intent);
+    }
+    else{
+        Intent intent = new Intent(IntroActivity.this, LoginActivity.class);
+        startActivity(intent);
+    }
+    finish();
+}
+```    
+
+IntroActivity는 해당 결과를 받아와 LoginActivity를 호출할지 MainActivity를 호출할지 결정해주기만 하면 된다. 그 후 onDestroy() 호출을 위해 finish를 해주면 된다. 
 
 
 
