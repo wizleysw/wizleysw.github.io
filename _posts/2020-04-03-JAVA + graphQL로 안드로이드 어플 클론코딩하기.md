@@ -859,3 +859,287 @@ View.OnClickListener Listener = new View.OnClickListener() {
 이렇게 해주면 갤러리로 부터 사진을 가져오는 것이 가능하다.
 
 ![gallery](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/gallery.png)
+
+### 카카오 로그인 구현
+
+[카카오 계정으로 로그인하기](https://re-build.tistory.com/9)
+
+사실 가장 기본적인 로직상 IntroActivity가 실행되고 나서 login여부에 따라 MainActivity로 메인 페이지로 이동시킬지 LoginActivity로 로그인 관련 로직을 처리할지를 결정지어야 된다. 현재의 흐름은 IntroActivity가 LoginActivity가 아닌 MainActivity로 바로 이동하기 때문에 이 부분에 대한 구현이 진행되어야 한다.
+
+이번에는 카카오 api를 사용해서 로그인을 구현해보기로 하였다. 카카오 로그인을 사용하면 좋은 점이 여러가지 정보들에 대한 처리를 나의 서버가 아닌 카카오쪽에 전담할 수 있다. 계정에 대한 유출에 대한 고민을 줄일 수 있고 관련 DB에 처리를 부담하지 않을 수 있기 때문에 익숙해진다면 개발의 속도를 늘릴 수 있다. 
+
+이제 API를 사용해볼건데 이를 위해서는 Android용 SDK를 설치하여야 한다. 카카오 디벨로퍼에서 해당 sdk를 다운받거나 Gradle에 추가하는 방향으로 진행할 수 있다. Gradle은 프로젝트의 빌드에 사용되며 Maven을 통해 써드파티 라이브러리를 추가할 수 있다.
+
+[카카오 SDK 적용 공식문서](https://developers.kakao.com/docs/latest/ko/getting-started/sdk-android-v1)
+
+aintstagram/build/build.gradle 내부에 아래와 같이 라이브러리를 추가해준다.
+
+```javascript
+subprojects {
+    repositories {
+        google()
+        jcenter()
+        maven { url 'https://devrepo.kakao.com/nexus/content/groups/public/' }
+    }
+}
+```
+
+그리고 app 아래의 build gradle에 implementation을 추가해준다.
+
+```javascript
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation 'androidx.recyclerview:recyclerview:1.1.0'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+
+    implementation group: 'com.kakao.sdk', name: 'usermgmt', version: '1.27.0'
+    // 카카오톡
+    implementation group: 'com.kakao.sdk', name: 'kakaotalk', version: '1.27.0'
+    // 카카오링크
+    implementation group: 'com.kakao.sdk', name: 'kakaolink', version: '1.27.0'
+}
+```
+
+이제 Manifest에서 API에 대한 네이티브 키를 등록해주면 된다.
+
+```xml
+<meta-data
+    android:name="com.kakao.sdk.AppKey"
+    android:value="{NATIVE_APP_KEY}" />
+```
+
+해시에 대한 정보를 아래의 명령어를 입력하여 생성 후에 kakao.developer.com에 등록해준다.
+
+```console
+Wizley:~/git/aintstagram # keytool -exportcert -alias androiddebugkey -keystore ~/.android/debug.keystore -storepass android -keypass android | openssl sha1 -binary | openssl base64
+```
+
+그리고 테스트를 위해서 빌드를 시키면 정상적으로 완료되는 것을 확인할 수 있다.
+
+[카카오 로그인 가이드](https://developers.kakao.com/docs/latest/ko/kakaologin/common)
+
+카카오의 로그인 서비스는 REST api를 통해 구현되며 토큰을 주고 받는 방식으로 진행된다고 한다. 로직을 보면 사용자가 정보를 요청하면 토큰을 발급해서 넘겨주는 방식인 것 같다. LoginActivity를 위한 레이아웃을 설계하였다.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:background="#000000"
+    tools:context=".LoginActivity">>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_top"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/logo"
+        app:layout_constraintGuide_begin="100dp"/>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/logo"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintGuide_end="100dp"/>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_left"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/guideline_top"
+        app:layout_constraintBottom_toTopOf="@id/guideline_bottom"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@id/logo"
+        app:layout_constraintGuide_begin="30dp"/>
+
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_right"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/guideline_top"
+        app:layout_constraintBottom_toTopOf="@id/guideline_bottom"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintLeft_toRightOf="@id/logo"
+        app:layout_constraintGuide_end="30dp"/>
+
+    <ImageView
+        android:id="@+id/logo"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:src="@drawable/aintstagram"
+        app:layout_constraintBottom_toTopOf="@id/guideline_bottom"
+        app:layout_constraintTop_toBottomOf="@id/guideline_top"
+        app:layout_constraintLeft_toRightOf="@id/guideline_left"
+        app:layout_constraintRight_toLeftOf="@id/guideline_right"/>
+
+    <com.kakao.usermgmt.LoginButton
+        android:id="@+id/login_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginBottom="30dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+```
+
+기존의 introActivity에 카카오에서 제공하는 LoginButton을 추가하였다. 
+
+![login](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/loginactivity.png)
+
+이를 핸들링하기 위한 LoginActivity.java 파일은 아래와 같다.
+
+```java
+package com.ssg.aintstagram;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.os.Bundle;
+import android.util.Log;
+import androidx.annotation.Nullable;
+import com.kakao.auth.ISessionCallback;
+import com.kakao.auth.Session;
+import com.kakao.util.exception.KakaoException;
+
+public class LoginActivity extends Activity {
+
+    private ISessionCallback sessionCallback = new ISessionCallback() {
+        @Override
+        public void onSessionOpened() {
+            Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+            startActivity(intent);
+        }
+
+        @Override
+        public void onSessionOpenFailed(KakaoException exception) {
+            
+        }
+    };
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_login);
+        
+        Session.getCurrentSession().addCallback(sessionCallback);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        Session.getCurrentSession().removeCallback(sessionCallback);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if(Session.getCurrentSession().handleActivityResult(requestCode, resultCode, data)){
+            return;
+        }
+
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+}
+```
+
+해당 액티비티가 생성이 되면 activity_login으로 view가 생성이 되고 getCurrentSession()을 통해 세션에 대한 정보를 가져온다. 만약 존재하면 MainActivity를 호출하게 된다. 여기서 이를 처리하기 위한 sdk에 대한 코드를 생성해야 된다.
+
+```java
+package com.ssg.aintstagram;
+
+import android.app.Application;
+import android.content.Context;
+import com.kakao.auth.IApplicationConfig;
+import com.kakao.auth.KakaoAdapter;
+import com.kakao.auth.KakaoSDK;
+
+public class MyKakaoAdapter extends Application {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        // SDK 초기화
+        KakaoSDK.init(new KakaoAdapter() {
+
+            @Override
+            public IApplicationConfig getApplicationConfig() {
+                return new IApplicationConfig() {
+                    @Override
+                    public Context getApplicationContext() {
+                        return MyKakaoAdapter.this;
+                    }
+                };
+            }
+        });
+    }
+}
+```
+
+MyKakaoAdapter라는 KakaoAdapter를 application으로 생성해주면 된다. 이를 위해선 Manifest에 추가해주어야 된다.
+
+```xml
+<application
+    android:name=".MyKakaoAdapter"
+```
+
+이제 테스트를 해보면 아이디/패스워드로 요청을 보내고 사용자의 동의를 얻으면 MainActivity로 이동하는 것을 확인할 수 있다.
+
+```xml
+generic_x86_arm:/data/data/com.ssg.aintstagram/shared_prefs # ls
+3f5c6005c0954ba8a11e315b702a5442.xml  WebViewChromiumPrefs.xml
+at 3f5c6005c0954ba8a11e315b702a5442.xml                                                                      
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="com.kakao.token.RefreshToken.ExpiresAt">{&quot;value&quot;:1592044787261,&quot;valueType&quot;:&quot;long&quot;}</string>
+    <string name="com.kakao.token.AccessToken.ExpiresAt">{&quot;value&quot;:1586903987261,&quot;valueType&quot;:&quot;long&quot;}</string>
+    <string name="com.kakao.token.RefreshToken">{&quot;value&quot;:&quot;something&quot;,&quot;valueType&quot;:&quot;string&quot;}</string>
+    <string name="com.kakao.token.AccessToken">{&quot;value&quot;:&quot;something&quot;,&quot;valueType&quot;:&quot;string&quot;}</string>
+</map>
+```
+
+adb로 접속해서 확인해보면 Token에 대한 정보가 로컬 저장소에 정상적으로 저장된 것을 확인할 수 있었다.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
