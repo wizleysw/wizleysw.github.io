@@ -1176,11 +1176,123 @@ public void handleMessage(Message msg){
 
 IntroActivity는 해당 결과를 받아와 LoginActivity를 호출할지 MainActivity를 호출할지 결정해주기만 하면 된다. 그 후 onDestroy() 호출을 위해 finish를 해주면 된다. 
 
+## Backend/API Side 개발
+
+### 카카오 로그인 정보로 계정 생성하기
+
+카카오 API를 활용하여 로그인을 하기 때문에 그에 해당하는 DB를 설계해줘야 된다. 일단은 간단하게 아래와 같이 모델을 설계하였다.
+
+```python
+from django.db import models
 
 
+class UserModel(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name="아이디")
+    kakaoID = models.IntegerField(unique=True, verbose_name="카카오")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="가입날짜")
+
+    def __str__(self):
+        return self.name
+```
+
+가장 최소한의 정보로는 name으로 사용할 정보와 kakao 계정id 정보, 그리고 가입날짜가 되겠다. 물론 프로필 사진과 같은 정보들이 필요하겠지만 일단은 가장 최소화 형태로 구현하기로 한다.
+
+graphQL을 사용할 것이기 때문에 해당 모델에 대한 정보를 제대로 가져오는지 테스트가 필요했다. 그래서 test라는 name으로 계정을 하나 생성하였다. 이제 graphQL이 제대로 정보를 가져오는지 테스트를 해봐야된다. 이를 위해서 아래와 같이 요청을 해보았다.
+
+```
+query {
+    users{
+        name
+        kakaoID
+        date
+    }
+}
+```
+
+해당 요청을 받은 api서버는 아래의 로직을 타게 된다.
+
+```python
+class UserType(DjangoObjectType):
+    class Meta:
+        model = UserModel
 
 
+class Query(graphene.ObjectType):
+    users = graphene.List(UserType)
 
+    def resolve_users(self, info):
+        return UserModel.objects.all()
+```
+
+users로 들어온 UserType 즉, UserModel이라는 model에 대한 리스트를 리턴해준다. 결과를 확인해보면 아래와 같이 정상적으로 값을 가져온 것을 확인할 수 있었다.
+
+```json
+{
+    "data": {
+        "users": [
+            {
+                "name": "test",
+                "kakaoID": 0,
+                "date": "2020-04-14T14:03:38.309435+00:00"
+            }
+        ]
+    }
+}
+```
+
+생성과 같은 경우에는 mutation을 아래처럼 사용하면 된다. 나의 경우 Output으로 UserType을 넘겨줬더니 여러 문제가 계속 발생해서 일단은 아래와 같이 해결하였다.
+
+```python
+class CreateUser(graphene.Mutation):
+    name = graphene.String()
+    kakaoID = graphene.Int()
+    date = graphene.DateTime()
+
+    class Arguments:
+        name = graphene.String(required=True)
+        kakaoID = graphene.Int(required=True)
+
+    def mutate(self, info, name, kakaoID):
+        user = UserModel(name=name, kakaoID=kakaoID)
+        user.save()
+        return CreateUser(
+            name=user.name,
+            kakaoID=user.kakaoID,
+            date=user.date
+        )
+
+
+class Mutation(graphene.ObjectType):
+    create_user = CreateUser.Field()
+
+
+schema = graphene.Schema(
+    query=Query,
+    mutation=Mutation
+)
+```
+
+쿼리를 다음과 같이 날리면,
+
+```
+`
+```
+
+save가 되고 나면 다음과 같이 응답이 돌아온다.
+
+```json
+{
+    "data": {
+        "createUser": {
+            "name": "wizley",
+            "kakaoID": 1234,
+            "date": "2020-04-14T15:10:36.012405+00:00"
+        }
+    }
+}
+```
+
+하지만 여기에서 아직 진행하지 않은 작업이 있다. 계정이 이미 존재하는지에 대한 검사를 수행하지 않은 것이다. 
 
 
 
