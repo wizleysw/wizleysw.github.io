@@ -1275,7 +1275,13 @@ schema = graphene.Schema(
 쿼리를 다음과 같이 날리면,
 
 ```
-`
+mutation {
+    createUser (name: "wizley", kakaoID: 1234){
+        name
+        kakaoID
+        date
+    }
+}
 ```
 
 save가 되고 나면 다음과 같이 응답이 돌아온다.
@@ -1292,16 +1298,122 @@ save가 되고 나면 다음과 같이 응답이 돌아온다.
 }
 ```
 
-하지만 여기에서 아직 진행하지 않은 작업이 있다. 계정이 이미 존재하는지에 대한 검사를 수행하지 않은 것이다. 
+하지만 여기에서 아직 진행하지 않은 작업이 있다. 계정이 이미 존재하는지에 대한 검사를 수행하지 않은 것이다. 그래서 try문을 통해 기존 kakaoID 계정이 존재하는지를 확인하는 코드를 추가해주었다.
+
+```python
+class CreateUser(graphene.Mutation):
+    name = graphene.String()
+    kakaoID = graphene.Int()
+    date = graphene.DateTime()
+
+    class Arguments:
+        name = graphene.String(required=True)
+        kakaoID = graphene.Int(required=True)
+
+    def mutate(self, info, name, kakaoID):
+        try:
+            user = UserModel.objects.get(kakaoID=kakaoID)
+        except:
+            user = UserModel(name=name, kakaoID=kakaoID)
+            user.save()
+        return CreateUser(
+            name=user.name,
+            kakaoID=user.kakaoID,
+            date=user.date
+        )
+```
+
+### Apollo graphql 적용하기
+
+이제 해당 요청을 안드로이드에서 api서버로 해야되는데 찾아보니 apollo graphql이 있었다.
+
+[apollo-grapQL](https://github.com/apollographql/apollo-android)
+
+순서대로 따라해보면 root의 gradle에 아래를 추가해주어야 된다.
+
+```javascript
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath("com.apollographql.apollo:apollo-gradle-plugin:1.4.4")
+    }
+}
+```
+
+그리고 app의 gradle에 아래와 같이 추가해준다.
+
+```javascript
+apply plugin: 'com.apollographql.apollo'
 
 
 
+dependencies {
+    
+    implementation("com.apollographql.apollo:apollo-runtime:1.4.4")
+}
+````
 
+성공적으로 프로젝트에 대한 빌드가 진행되는 것을 확인할 수 있었다. 여기서 또 삽질의 시간이 왔다. schema.json을 생성해주어야 되는데 공식 사이트의 커맨드 라인이 정상적으로 작동하지 않았다. 나의 경우 아래와 같이 해결할 수 있었다.
 
+```
+brew install apollo-cli
+```
 
+apollo-cli 패키지를 먼저 설치를 한다.
 
+```console
+Wizley:~/git/aintstagram/app/src/main/graphql/com/ssg # apollo schema:download --endpoint=http://localhost:8000/graphql/ schema.json
+  ✔ Loading Apollo Project
+  ✔ Saving schema to schema.json
+```
 
+그 후 위와 같이 endpoint로 graphql 주소를 줘서 아래와 같은 schema.json을 만들 수 있었다.
 
+```json
+{
+  "__schema": {
+    "queryType": {
+      "name": "Query"
+    },
+    "mutationType": {
+      "name": "Mutation"
+    },
+    "subscriptionType": null,
+    "types": [
+      {
+        "kind": "OBJECT",
+        "name": "Query",
+        "description": null,
+        "fields": [
+          {
+            "name": "users",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "kind": "OBJECT",
+                "name": "UserType",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+        // 생략
+    }
+}
+```
+
+무려 1112줄이나 된다. 이걸 직접 생성할려고 했으면 꽤나 힘들었을 것 같다. (다행히도 삽질을 통해서 자동생성할 수 있었음에 감사한다..)
 
 
 
