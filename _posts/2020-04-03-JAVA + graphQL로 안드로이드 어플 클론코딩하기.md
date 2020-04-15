@@ -1357,6 +1357,8 @@ dependencies {
 
 성공적으로 프로젝트에 대한 빌드가 진행되는 것을 확인할 수 있었다. 여기서 또 삽질의 시간이 왔다. schema.json을 생성해주어야 되는데 공식 사이트의 커맨드 라인이 정상적으로 작동하지 않았다. 나의 경우 아래와 같이 해결할 수 있었다.
 
+[Apollo graphQL client for Android](https://www.apollographql.com/docs/android/essentials/get-started/)
+
 ```
 brew install apollo-cli
 ```
@@ -1413,8 +1415,101 @@ Wizley:~/git/aintstagram/app/src/main/graphql/com/ssg # apollo schema:download -
 }
 ```
 
-무려 1112줄이나 된다. 이걸 직접 생성할려고 했으면 꽤나 힘들었을 것 같다. (다행히도 삽질을 통해서 자동생성할 수 있었음에 감사한다..)
+무려 1112줄이나 된다. 이걸 직접 생성할려고 했으면 꽤나 힘들었을 것 같다. (다행히도 삽질을 통해서 자동생성할 수 있었음에 감사한다..) 자 여기서 또 엄청나게 삽질을 했다. 적용을 위해서는 아래와 같이 한번더 gradle에 추가가 필요하다.
 
+```
+apollo {
+    generateKotlinModels.set(false)
+}
+```
+
+app아래의 build.gradle에 추가해주면 되는데 false를 하면 java로 적용된다. 그리고 이것 뿐만 아니라 해당 build.gradle에 하나의 옵션을 더 주어야 되는데 이걸 주지 않으면 notNULL과 같은 패키지 오류가 발생한다.
+
+```
+implementation 'org.jetbrains:annotations:13.0'
+```
+
+여기까지 작성하면 정상적으로 작동한다.
+
+```graphql
+mutation create_user($name:String!, $kakaoID:Int!){
+    createUser (name: $name, kakaoID: $kakaoID){
+        name
+        kakaoID
+        date
+    }
+}
+```
+
+### api 서버로 쿼리 요청 및 응답받아오기
+
+이번에는 graphql아래의 디렉토리에 createUser.graphql을 생성하였다. createUser는 schema.json에 있는 그 이름 그대로 써야되며 mutation 타입아래 서버의 createUser부분을 의미한다. 이제 요청을 보내는 부분을 아래와 같이 작성한다.
+
+```java
+public void getUserInfo(){
+        List<String> keys = new ArrayList<>();
+        keys.add("properties.nickname");
+
+        UserManagement.getInstance().me(keys, new MeV2ResponseCallback() {
+            @Override
+            public void onSessionClosed(ErrorResult errorResult) {
+
+            }
+
+            @Override
+            public void onSuccess(MeV2Response result) {
+                String Nickname = result.getNickname();
+                int kakaoID = (int) result.getId();
+                Log.e("LOG HERE", "requestMe onSuccess message : " + Nickname + " " + kakaoID);
+
+                String base_URL = "http://10.0.2.2:8000/graphql/";
+                OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+                ApolloClient apolloClient = ApolloClient.builder().serverUrl(base_URL).okHttpClient(okHttpClient).build();
+
+                final Create_userMutation userCreation = Create_userMutation.builder().name(Nickname).kakaoID(kakaoID).build();
+
+                apolloClient.mutate(userCreation).enqueue(new ApolloCall.Callback<Create_userMutation.Data>() {
+                    @Override
+                    public void onResponse(Response<Create_userMutation.Data> response) {
+                        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                        startActivity(intent);
+
+                    }
+
+                    @Override
+                    public void onFailure(ApolloException e) {
+                        Log.e("grapql", e.getLocalizedMessage());
+                    }
+                });
+            }
+        });
+    }
+```
+
+카카오 api가 정상적으로 값을 가져와서 onSuccess가 호출이 되면 OkHttpClient와 ApolloClient를 통해서 graphql endpoint로 쿼리를 전송한다. apolloClient.query는 쿼리를 위한 요청이고 위의 mutate는 mutation을 위한 요청이다. onResponse를 통해 결과로 Data가 돌아오는데 response.data().createUser.kakaoID 와 같은 형식으로 값을 가져오는게 가능하다. 하지만 해당 기능을 구현하는데 자꾸 onFailure가 호출되었다.
+
+```
+2020-04-15 22:10:02.094 15908-16050/com.ssg.aintstagram D/GRAPHQL: Failed to execute http call
+```
+
+찾아보니 AVD에서는 10.0.2.2로 localhost와 통신을 한다는데 브라우저를 통해 접속하면 접속이 되도 앱에서 쏘면 작동을 하지 않고 위와 같은 에러가 발생하였다. 많은 고민끝에 해결했는데 아마 아래의 한 줄을 매니패스트에 추가해주면서 해결이 된 것 같다. 
+
+```xml
+<application
+    android:usesCleartextTraffic="true"
+```
+
+로컬을 https가 아닌 http로 통신을 하도록 설정을 했기 때문에 프로토콜에 의한 접근 제한을 당한것 같다. 이렇게 해결하면 정상적으로 서버로부터 응답이 오는 것을 확인할 수 있었다.
+
+```console
+aintstagram | [15/Apr/2020 22:18:10] "POST /graphql/ HTTP/1.1" 200 130
+aintstagram | [15/Apr/2020 22:19:00] "POST /graphql/ HTTP/1.1" 200 130
+aintstagram | [15/Apr/2020 22:19:30] "POST /graphql/ HTTP/1.1" 200 130
+aintstagram | [15/Apr/2020 22:22:13] "POST /graphql/ HTTP/1.1" 200 130
+aintstagram | [15/Apr/2020 22:26:08] "POST /graphql/ HTTP/1.1" 200 130
+```
+
+이렇게 graphql과 통신을 하는 방법에 대해서 익힐 수 있었다. 
 
 
 
