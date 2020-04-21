@@ -1512,8 +1512,143 @@ aintstagram | [15/Apr/2020 22:26:08] "POST /graphql/ HTTP/1.1" 200 130
 이렇게 graphql과 통신을 하는 방법에 대해서 익힐 수 있었다. 
 
 
+### DB 구성하기
+
+백엔드 쪽과 뷰를 짜기 위해서는 모델에 대한 설계가 필요하다. 기능들을 세분화하여서 모델의 구조를 아래의 그림과 같이 만들었다.
+
+![modelling](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/modelling.png)
+
+그리고 이에 따라 models.py를 구성해보면 아래와 같다.
+
+```python
+from django.db import models
 
 
+class UserModel(models.Model):
+    user_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100, unique=True, verbose_name="아이디")
+    kakaoID = models.IntegerField(unique=True, verbose_name="카카오")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="가입날짜")
+    profile = models.ImageField(upload_to="pictures/profile", verbose_name="프로필사진")
+    text_comment = models.CharField(max_length=30, verbose_name="코멘트")
+    post_count = models.IntegerField(verbose_name="포스트", default=0)
+    follower_count = models.IntegerField(verbose_name="팔로워", default=0)
+    following_count = models.IntegerField(verbose_name="팔로잉", default=0)
+    is_open = models.BooleanField(verbose_name="공개 여부", default=True)
+
+    def __str__(self):
+        return self.name
+
+
+class HistoryModel(models.Model):
+    history_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(UserModel, verbose_name="사용자", on_delete=models.CASCADE)
+    selection = (
+        ('F', 'Follow'),
+        ('L', 'Like'),
+        ('C', 'Comment'),
+    )
+    type = models.CharField(max_length=1, verbose_name="타입", choices=selection, default='C')
+    record_id = models.IntegerField(verbose_name="번호")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="생성날짜")
+    is_active = models.BooleanField(verbose_name="노출 여부", default=True)
+
+
+class PictureModel(models.Model):
+    pic_id = models.AutoField(primary_key=True)
+    pic = models.ImageField(upload_to="pictures/pic", verbose_name="사진")
+    record_id = models.IntegerField(verbose_name="번호")
+    pic_idx = models.IntegerField(verbose_name="인덱스")
+    selection = (
+        ('P', 'Post'),
+        ('S', 'Story'),
+        ('M', 'Message')
+    )
+    type = models.CharField(max_length=1, verbose_name="타입", choices=selection, default='P')
+
+
+class StoryModel(models.Model):
+    story_id = models.AutoField(primary_key=True)
+    pic = models.ForeignKey(PictureModel, verbose_name="사진", on_delete=models.CASCADE)
+    user = models.ForeignKey(UserModel, verbose_name="유저", on_delete=models.CASCADE)
+    date = models.DateTimeField(auto_now_add=True, verbose_name="생성날짜")
+    is_active = models.BooleanField(verbose_name="활성화 여부", default=True)
+
+
+class FollowModel(models.Model):
+    follow_id = models.AutoField(primary_key=True)
+    user_from = models.ForeignKey(UserModel, verbose_name="요청", related_name="follow_user_from", on_delete=models.CASCADE)
+    user_to = models.ForeignKey(UserModel, verbose_name="응답", related_name="follow_user_to", on_delete=models.CASCADE)
+    date = models.DateTimeField(auto_now_add=True, verbose_name="생성날짜")
+
+
+class MessageModel(models.Model):
+    message_id = models.AutoField(primary_key=True)
+    sender = models.ForeignKey(UserModel, verbose_name="보낸이", on_delete=models.CASCADE)
+    chatroom_id = models.IntegerField(verbose_name="번호")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="생성날짜")
+    has_seen = models.BooleanField(verbose_name="확인여부", default=False)
+    pic = models.ForeignKey(PictureModel, verbose_name="사진", on_delete=models.CASCADE)
+    text_message = models.CharField(max_length=50, verbose_name="메시지")
+
+
+class ChatroomModel(models.Model):
+    chatroom_id = models.AutoField(primary_key=True)
+    user_from = models.ForeignKey(UserModel, verbose_name="생성자", related_name="chatroom_user_from", on_delete=models.CASCADE)
+    user_to = models.ForeignKey(UserModel, verbose_name="초대받은자", related_name="chatroom_user_to", on_delete=models.CASCADE)
+
+
+class HashtagModel(models.Model):
+    tag_id = models.AutoField(primary_key=True)
+    tag_name = models.CharField(max_length=8, verbose_name="태그")
+    selection = (
+        ('P', 'Post'),
+        ('C', 'Comment'),
+    )
+    type = models.CharField(max_length=1, verbose_name="타입", choices=selection, default='P')
+    record_id = models.IntegerField(verbose_name="번호")
+
+
+class LikeModel(models.Model):
+    like_id = models.AutoField(primary_key=True)
+    selection = (
+        ('P', 'Post'),
+        ('C', 'Comment'),
+    )
+    type = models.CharField(max_length=1, verbose_name="타입", choices=selection, default='P')
+    user_from = models.ForeignKey(UserModel, verbose_name="준 이", related_name="like_user_from", on_delete=models.CASCADE)
+    user_to = models.ForeignKey(UserModel, verbose_name="받은 이", related_name="like_user_to", on_delete=models.CASCADE)
+    date = models.DateTimeField(auto_now_add=True, verbose_name="생성날짜")
+    record_id = models.IntegerField(verbose_name="번호")
+
+
+class PostModel(models.Model):
+    post_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(UserModel, verbose_name="유저", on_delete=models.CASCADE)
+    allow_comment = models.BooleanField(default=True, verbose_name="코멘트 활성화여부")
+    place = models.CharField(max_length=14, verbose_name="장소")
+    like_count = models.IntegerField(default=0, verbose_name="좋아요 개수")
+    text_comment = models.CharField(max_length=100, verbose_name="코멘트")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="작성일자")
+
+
+class CommentModel(models.Model):
+    comment_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(UserModel, verbose_name="유저", on_delete=models.CASCADE)
+    date = models.DateTimeField(auto_now_add=True, verbose_name="작성일자")
+    post_id = models.IntegerField(verbose_name="포스트 번호")
+    parent = models.IntegerField(null=True)
+    like_count = models.IntegerField(default=0, verbose_name="좋아요 개수")
+    text_comment = models.CharField(max_length=100, verbose_name="코멘트")
+```
+
+이 과정에서 ImageField를 사용하기 위해서는 Pillow를 설치하여야 되는데 설치가 잘 되지 않아 아래의 명령어로 설치를 하였다.
+
+```console
+pip3 install --user git+https://github.com/python-imaging/Pillow
+```
+
+이제 구성한 다이어그램을 기준으로 코드를 작성하면 될 것 같다.
 
 
 
