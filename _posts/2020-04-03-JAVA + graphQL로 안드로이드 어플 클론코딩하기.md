@@ -1651,6 +1651,205 @@ pip3 install --user git+https://github.com/python-imaging/Pillow
 이제 구성한 다이어그램을 기준으로 코드를 작성하면 될 것 같다.
 
 
+### graphql Query문 변형
 
+이번에는 프로필 정보를 가져오기 위해서 정보를 추가하여 보자. 대략적으로 kakaoID를 기반으로 가져오는 것과 user의 이름으로 가져오는 것 두 분류만 있으면 될 것같다.
 
+```python
+class Query(graphene.ObjectType):
+    users = graphene.List(UserType,
+                          kakaoID=graphene.Int(),
+                          username=graphene.String(),
+                          )
 
+    def resolve_users(self, info, kakaoID=None, username=None):
+        query = UserModel.objects.all()
+
+        if kakaoID:
+            return UserModel.objects.filter(kakaoID=kakaoID)
+
+        elif username:
+            return UserModel.objects.filter(name=username)
+
+        else:
+            return query
+```
+
+방법은 위와 같다. List에 kakaoID와 username이라는 필드를 추가한 뒤 해당 필드가 존재할 경우에 그에 따른 filter 결과를 돌려주면 된다.
+
+```console
+query {
+    users (username:"Wizley"){
+        name
+        kakaoID
+    }
+}
+```
+
+이제 이렇게 명시적으로 요청을 하면 아래와 같이 정보를 확인하여 돌려주는 것을 확인할 수 있다. 만약 filter의 결과가 존재하지 않으면 []를 리턴해준다.
+
+```console
+{
+    "data": {
+        "users": [
+            {
+                "name": "Wizley",
+                "kakaoID": 1111111111
+            }
+        ]
+    }
+}
+```
+
+이제 해당 부분을 토대로 사용자의 정보를 profile 탭에서 뿌려주는 부분을 구현해 볼 것이다. 이를 위해서는 schema.json의 위와 같이 다시 만들어야 된다. 그리고 아래와 같이 java파일 하나를 추가하였다.
+
+```graphql
+query userType($name:String, $kakaoID:Int){
+    users (username: $name, kakaoID: $kakaoID){
+        name
+        kakaoID
+        textComment
+        postCount
+        followerCount
+        followingCount
+        profile
+        isOpen
+    }
+}
+
+```
+
+Query문을 위해 사용되며 userType Object에 대하여 users로 username 또는 KakaoID를 기반으로 조회하여 결과를 돌려준다. 위의 요청이 가면 아래의 형태로 응답이 돌아오게된다.
+
+```json
+{
+    "data": {
+        "users": [
+            {
+                "name": "Wizley",
+                "kakaoID": 11111,
+                "textComment": "Hello Wizley!",
+                "postCount": 0,
+                "followerCount": 0,
+                "followingCount": 0,
+                "profile": "pictures/profile/kiki.png"
+            }
+        ]
+    }
+}
+```
+
+자바에서 해당 부분을 보내는 코드는 다음과 같다.
+
+```java
+ String base_URL = "http://10.0.2.2:8000/graphql/";
+                OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+                ApolloClient apolloClient = ApolloClient.builder().serverUrl(base_URL).okHttpClient(okHttpClient).build();
+
+                final UserTypeQuery u = UserTypeQuery.builder().kakaoID(kakaoID).build();
+
+                apolloClient.query(u).enqueue(new ApolloCall.Callback<UserTypeQuery.Data>() {
+                    @Override
+                    public void onResponse(@NotNull Response<UserTypeQuery.Data> response) {
+                        post_cnt = response.data().users().get(0).postCount;
+                        follower_cnt = response.data().users().get(0).followerCount;
+                        following_cnt = response.data().users().get(0).followingCount;
+                        is_open = response.data().users().get(0).isOpen;
+                        final String profile_img = getString(R.string.media_url) + response.data().users().get(0).profile;
+```
+
+Mutation과 거의 동일한데 UserTypeQuery와 같이 명시된 형태를 사용해야 한다는 점에서 약간의 차이가 있다. 결과에 대해서는 List 형으로 돌아오기 때문에 인덱스를 기반으로 값을 가져와야 된다.
+
+### Django MEDIA URL 설정
+
+이미지에 대한 링크가 response로 돌아오기 때문에 해당 url을 기반으로 이미지를 받아와야 된다. 이를 위해서 다음과 같이 세팅을 해주었다.
+
+```python
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+```
+
+settings.py에서 이미지를 저장할 위치를 BASE_DIR를 기준으로 설정을 해주었다. 그리고 url을 통해 접근하기 위해서 main app의 urls.py에 아래와 같이 한줄을 추가하였다.
+
+```python
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+```
+
+이렇게 추가를 해주면 url을 통해 해당 정보에 접근이 가능하다. 이제 java에서 이 정보를 토대로 화면에 그려주는 작업을 수행해볼 것이다. 먼저 고정된 주소를 여러 activity에서 사용할 것이기 때문에 res 내부의 strings.xml에 아래와 같이 정보를 추가해준다.
+
+```xml
+<resources>
+    <string name="app_name">aintstagram</string>
+    <string name="media_url">http://10.0.2.2:8000/media/</string>
+</resources>
+```
+
+이렇게 등록을 해두게 되면 getString을 통해 아래와 같이 해당 문자열을 가져오는게 가능하다. 물론 윗 부분에 포맷스트링을 사용하여 builder로 생성하는 것 또한 가능하다.
+
+```java
+final String profile_img = getString(R.string.media_url) + response.data().users().get(0).profile;
+
+Thread mThread = new Thread() {
+    @Override
+    public void run() {
+        try {
+            URL img_url = new URL(profile_img);
+            HttpURLConnection conn = (HttpURLConnection) img_url.openConnection();
+            conn.setDoInput(true);
+            conn.connect();
+
+            InputStream is = conn.getInputStream();
+            bitmap = BitmapFactory.decodeStream(is);
+
+            runOnUiThread(new Runnable(){
+                public void run(){
+                    ImageView v_profile = (ImageView)findViewById(R.id.user_profile);
+                    v_profile.setImageBitmap(bitmap);
+                }
+            });
+        } catch(
+        MalformedURLException e) {
+            e.printStackTrace();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+};
+
+mThread.start();
+```
+
+네트워크 작업을 수행하기 위해 Thread를 만들었는데 thread는 실행되면 url로부터 bitmap 형태로 이미지를 가져오게 된다. 이 과정에서 주의해야 될 것이 있는데 view에 대한 설정은 MainThread에서만 수행되기 때문에 원할한 처리를 위해서 runOnUiThread를 사용하여 ImageView의 setImageBitmap을 처리해주어야 된다. 이와 같이 처리를 하고 나면 정상적으로 이미지가 ImageView 화면에 그려진다.
+
+### CircleImageView 추가
+
+[CircleImageView](https://github.com/hdodenhof/CircleImageView)
+
+인스타그램의 프로필 사진이 동그랗게 생겼기 때문에 해당 부분에 대한 구현을 고민해보았는데 역시나 누군가가 이미 만든 라이브러리가 있었다. 해당 라이브러리를 사용해주면 쉽게 그리는 것이 가능하다.
+
+```xml
+implementation 'de.hdodenhof:circleimageview:3.1.0'
+```
+
+build.gradle에 Implementation을 추가한 뒤 아래와 같이 layout에서 구현을 해주면 된다.
+
+```xml
+<de.hdodenhof.circleimageview.CircleImageView
+    android:id="@+id/user_profile"
+    android:layout_height="150dp"
+    android:layout_width="0dp"
+    app:layout_constraintVertical_weight="1"
+    app:layout_constraintHorizontal_weight="1.5"
+    app:layout_constraintTop_toTopOf="@id/guideline_top_menu"
+    app:layout_constraintBottom_toTopOf="@id/user_comment"
+    app:layout_constraintLeft_toLeftOf="parent"
+    app:layout_constraintRight_toLeftOf="@id/user_posts"
+    app:civ_border_width="2dp"
+    app:civ_border_color="@android:color/white"
+    tools:ignore="MissingConstraints" />
+```        
+
+이렇게 구현을 한 뒤 확인을 해보면 나름 비슷한 화면이 구현된 것을 확인할 수 있다.
+
+![profileview_1](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/profileview_1.png)
