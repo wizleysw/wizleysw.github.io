@@ -430,7 +430,7 @@ layout을 만들기 위해 인스타그램 어플이 가지고 있는 여러 페
 
 대충 모양에 대해서 흉내를 내보았다. 이런 식으로 골격과 사이즈를 재서 디자인을 진행하는 것 같다.
 
-## Android Side 개발
+## 본격 기능 구현 시작
 
 이제 하나씩 시작을 해보도록 하자. 프로그램의 전체적인 흐름을 대략적으로 살펴보았다. 테스트를 위해서는 백엔드쪽 DB에 대한 설계가 좀 필요할 것 같긴한데 프로그램이 시작되면서 흐르는 루틴에 따라 개발을 해보기로 하였다.
 
@@ -745,7 +745,7 @@ android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 <uses-feature android:name="android.hardware.camera" android:required="true" />
 ```
 
-이제 MainActivity에서 버튼에 대한 부분을 처리해주어야 되는데 Oncreate부분에 이를 작성할 것이다. 
+이제 MainActivity에서 버튼에 대한 부분을 처리해주어야 되는데 OnCreate부분에 이를 작성할 것이다. 
 
 ```java
 
@@ -1173,8 +1173,6 @@ public void handleMessage(Message msg){
 ```    
 
 IntroActivity는 해당 결과를 받아와 LoginActivity를 호출할지 MainActivity를 호출할지 결정해주기만 하면 된다. 그 후 onDestroy() 호출을 위해 finish를 해주면 된다. 
-
-## Backend/API Side 개발
 
 ### 카카오 로그인 정보로 계정 생성하기
 
@@ -1982,8 +1980,7 @@ MIDDLEWARE = (
 
 이를 통해 아래에 적을 file upload 기능이 요청이 정상적으로 전달되었음에도 서버쪽에서 문제가 있다는 점을 알게 되었고 수정할 수 있었다.
 
-
-## graphql file upload 구현하기
+### graphql file upload 구현하기
 
 이미지를 업로드 하기 위해서는 아래의 프레임워크를 하나 더 추가적으로 설치를 해야 한다.
 
