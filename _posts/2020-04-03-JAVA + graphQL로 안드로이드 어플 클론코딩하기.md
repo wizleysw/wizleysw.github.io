@@ -27,8 +27,6 @@ toc : true
 
 ### AppName
 
-클론 코딩의 주제로 정한 어플은 "세줄일기"라는 어플이다.
-
 [인스타그램](https://play.google.com/store/apps/details?id=com.instagram.android&hl=ko)
 
 원래 하고자 하는 다른 어플이 있었는데, 메일로 문의한 내용에 대한 답변이 오지 않아 부득이하게 변경을 하게 되었다. 많은 사람들이 클론 코딩 주제로 인스타그램을 선정하였는데 nodejs, react가 아닌 JAVA를 토대로 비슷하게 흉내내보는 토이 프로젝트로 진행하기로 하였다.
@@ -1853,3 +1851,234 @@ build.gradle에 Implementation을 추가한 뒤 아래와 같이 layout에서 �
 이렇게 구현을 한 뒤 확인을 해보면 나름 비슷한 화면이 구현된 것을 확인할 수 있다.
 
 ![profileview_1](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/profileview_1.png)
+
+### 카메라로 찍은 사진을 Public Directory에 저장하기 
+
+안드로이드의 보안 정책이 바뀜에 따라 FileProvider를 사용해서 앱 내부에 저장하는 방식이 권장되도록 변경되었다고 한다. 하지만 내가 만드는 앱이 저장할 이미지는 앱이 삭제된 후에도 남아있길 원하기 때문에 PublicDirectory에 저장을 해야 했다. 하지만 여기서 Uri와 관련해서 문제가 발생했고 아주 많은 시간을 구현에 할당해서 고칠 수 밖에 없었다. 
+
+코드는 대략적으로 두 부분으로 나뉜다. 파일을 해당 디렉토리에 생성하는 과정이 첫 번째이고, 그 다음은 CameraIntent를 통해 찍은 사진을 해당 파일로 저장하는 과정이다.
+
+```java
+    String imageFilePath;
+    private File mFile;
+    private File createImageFile() throws IOException {
+        String timeStamp =
+                new SimpleDateFormat("yyyyMMdd_HHmmss",
+                        Locale.getDefault()).format(new Date());
+        String imageFileName = "IMG_" + timeStamp + "_";
+//        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+
+        File storageDir  = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "aintstagram");
+        if(!storageDir.exists()) storageDir.mkdirs();
+
+        mFile = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        imageFilePath = mFile.getAbsolutePath();
+        Log.e("PATH", imageFilePath);
+        return mFile;
+    }
+```
+
+createImageFile은 현재 시간을 기준으로 timestamp를 찍어 IMG_timestamp_의 형식으로 이름을 만들어 준다. 그 후 getExternalStoragePublicDirectory를 통해 DIRECTORY_DCIM에 aintstagram이라는 폴더를 생선한다. 그 뒤 mFile 부분인 createTempFile을 통해 jpg 확장자의 파일 크기 0인 파일을 생성한 뒤 imageFilePath에 해당 절대 경로를 넣어주는 작업을 수행한다.
+
+```java
+case R.id.button_to_camera:
+    permissionCheck = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA);
+    if (permissionCheck == PackageManager.PERMISSION_DENIED) {
+        ActivityCompat.requestPermissions(MainActivity.this, PERMISSIONS, 0);
+    } else {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if(photoFile != null){
+//                                    Uri photoUri = FileProvider.getUriForFile(MainActivity.this, "com.ssg.aintstagram.fileprovider", photoFile);
+                intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                Uri photoUri = Uri.fromFile(photoFile);
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
+                startActivityForResult(intent, REQUEST_IMAGE_CAPTURE);
+            }
+        }
+    }
+    break;
+```       
+
+처리부분에서는 해당 함수를 호출한 결과를 photoFile로 지정한 뒤 Uri.fromFile을 통해 카메라로 찍은 사진이 해당 값에 저장되도록 설정한다. 그 후 사진을 찍게 되면 해당 폴더에 저장되는 것을 확인 가능하다.
+
+하지만 여기서 문제가 있었다. 위의 코드만 적을 경우 경로에 대한 문제가 발생하여서 exception이 발생했다. 많은 삽질끝에 아래의 두 줄을 onCreate 부분에 넣어서 해결할 수 있었다.
+
+```java
+StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
+StrictMode.setVmPolicy(builder.build());
+```                    
+
+해당 부분은 안드로이드가 여러 상황에 대해 분석을 하는데 Uri 관련된 부분에 대한 문제를 제기하지 않도록 함으로써 해결하는 것이다. 물론 해당 라인이 보안적인 측면에서 문제가 있을 확률이 아주 높지만 일단 지금 시점에서는 구현을 목표로 하기 때문에 위의 코드를 삽입하였다.
+
+기존의 fileProvider를 사용하는 방법은 다음과 같다.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-path name="aint_image"
+        path="Android/data/com.ssg.aintstagram/files/Pictures" />
+</paths>
+```
+
+경로를 담은 xml 파일을 만들어주고 해당 파일을 참조하는 fileProvider를 manifest 부분에 선언해주어야 된다.
+
+```xml
+<provider
+    android:name="androidx.core.content.FileProvider"
+    android:authorities="com.ssg.aintstagram.fileprovider"
+    android:exported="false"
+    android:grantUriPermissions="true">
+    <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/filepaths" />
+</provider>
+```
+
+filepaths가 위의 external-path의 정보를 담은 resource파일의 이름이며 FileProvider를 호출함으로써 fileProvider가 파일에 대한 처리를 수행한다.
+
+```java
+Uri photoUri = FileProvider.getUriForFile(MainActivity.this, "com.ssg.aintstagram.fileprovider", photoFile);
+```
+
+이 경우 위와 같이 FileProvider를 Uri로 넘겨주는 방식으로 사용하면 된다. 이렇게 저장된 이미지는 해당 앱의 내부에 저장되기 때문에 원칙적인 경우에 다른 앱에서 접근이 불가능하며 앱이 삭제되면 같이 삭제되는 특징이 있다.
+
+### django-request-logging
+
+graphql 관련 패킷이 400을 리턴하였었는데 이를 해결하기 위해서 내용을 확인하고 싶었다. 하지만 전송을 하는 주체가 httpclient를 사용한 방식이 아니기 때문에 안드로이드 스튜디오를 통해서를 모니터링이 잘 안되었다. 
+
+[django-request-logging](https://pypi.org/project/django-request-logging/)
+
+해당 middleware를 추가해주면 아래와 같이 요청에 대한 정보를 확인가능하다.
+
+```python
+aintstagram | [24/Apr/2020 03:13:30] "POST /graphql/ HTTP/1.1" 200 251
+aintstagram | GET /media/pictures/profile/IMG_20200424_031302_4311095808617875937.jpg
+aintstagram | {'HTTP_USER_AGENT': 'Dalvik/2.1.0 (Linux; U; Android R Build/RPP2.200227.014.A1)', 'HTTP_HOST': '10.0.2.2:8000', 'HTTP_CONNECTION': 'Keep-Alive', 'HTTP_ACCEPT_ENCODING': 'gzip'}
+aintstagram | GET /media/pictures/profile/IMG_20200424_031302_4311095808617875937.jpg - 200
+```
+
+설정 방법도 간단하다. pip을 통해 설치한 뒤 settings.py의 middleware 부분에 추가해주면 된다.
+
+```python
+MIDDLEWARE = (
+    ...,
+    'request_logging.middleware.LoggingMiddleware',
+    ...,
+)
+```
+
+이를 통해 아래에 적을 file upload 기능이 요청이 정상적으로 전달되었음에도 서버쪽에서 문제가 있다는 점을 알게 되었고 수정할 수 있었다.
+
+
+## graphql file upload 구현하기
+
+이미지를 업로드 하기 위해서는 아래의 프레임워크를 하나 더 추가적으로 설치를 해야 한다.
+
+```console
+root@f4e2834b513b:/code# pip install graphene-file-upload
+Collecting graphene-file-upload
+  Downloading graphene_file_upload-1.2.2-py3-none-any.whl (9.1 kB)
+Requirement already satisfied: six>=1.11.0 in /usr/local/lib/python3.8/site-packages (from graphene-file-upload) (1.14.0)
+Installing collected packages: graphene-file-upload
+Successfully installed graphene-file-upload-1.2.2
+```
+
+그 후 이점이 중요하다 !!! 바로 urls.py 부분을 변경해주어야 된다.
+
+```python
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    # path('graphql/', csrf_exempt(GraphQLView.as_view(graphiql=True))),
+    path('graphql/', csrf_exempt(FileUploadGraphQLView.as_view(graphiql=True))),
+]
+```
+
+해당 부분에 FileUploadGraphQLView로 변경을 해주지 않으면 multipart/form을 통해 정상적으로 이미지가 전송이 되었음에도 불구하고 400 Bad Request를 리턴해버린다. (이걸 해결하는데 시간이 엄청 오래 걸렸다..)
+
+```python
+from graphene_file_upload.scalars import Upload
+
+class UploadProfile(graphene.Mutation):
+    success = graphene.Boolean()
+
+    class Arguments:
+        kakaoID = graphene.Int(required=True)
+        img = Upload(required=True)
+
+    def mutate(self, info, kakaoID, img):
+        User = UserModel.objects.get(kakaoID=kakaoID)
+        img.name = str(kakaoID) + "_" + img.name
+        User.profile.delete()
+        User.profile = img
+        User.save()
+        return UploadProfile(success=True)
+```
+
+schema.py 부분에는 다음과 같이 mutate를 추가해준다. Upload라는 타입을 통해 img를 받아온 뒤 User를 kakaoID 기반으로 검색하여 기존의 프로필 사진을 삭제한 뒤 업로드 요청 된 img를 저장해준다. 
+
+이제 java로 클라이언트 쪽을 짜주면 되는데 이를 위해서는 약간의 세팅이 필요하다.
+
+```gradle
+apollo {
+    customTypeMapping = [
+            "Upload" : "com.apollographql.apollo.api.FileUpload"
+    ]
+    generateKotlinModels.set(false)
+}
+```
+
+gradle 부분에 Upload를 추가해줄건데 이 부분은 schema에 대한 graphql 파일 작성에 사용된다. schema.json을 아래의 명령으로 최신화 해준다.
+
+```console
+apollo schema:download --endpoint=http://localhost:8000/graphql/ schema.json
+```
+
+이번에는 처리를 위한 mutation을 작성해주는데 방식은 동일하다. 다만 Upload를 사용한다는 점만 차이가 있다.
+
+```graphql
+mutation upload_profile($img:Upload!, $kakaoID:Int!){
+    uploadProfile (img: $img, kakaoID: $kakaoID){
+        success
+    }
+}
+```
+
+java코드도 기존과 동일하다. 조금 다른 점이 있다면 FileUpload 타입으로 iamge를 지정해주어야 된다. 이 때 File에 대한 인자로 imageFilePath가 들어가게 되는데 절대경로를 따서 넣어주면 된다. 이렇게 요청을 보내면 정상적으로 처리가 될 경우 profile에 대한 정보가 최신화 되는 것을 확인할 수 있다.
+
+```java
+OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+
+// bitmap 처리 부분
+final Upload_profileMutation uploadProfile = Upload_profileMutation.builder().img(new FileUpload("image/jpg", new File(imageFilePath))).kakaoID(1111).build();
+Log.e("FilePath ", imageFilePath);
+Log.e("LOG", uploadProfile.toString());
+apolloClient.mutate(uploadProfile).enqueue(new ApolloCall.Callback<Upload_profileMutation.Data>() {
+    @Override
+    public void onResponse(@NotNull Response<Upload_profileMutation.Data> response) {
+        Log.e("HEY", "WORLD");
+    }
+
+    @Override
+    public void onFailure(@NotNull ApolloException e) {
+        e.printStackTrace();
+        Log.e("HEY", "WORLD2");
+    }
+    });
+```            
+
+아무래도 java - graphql 도 드문 조합이고 graphql - django 도 드물기 때문에 레퍼런스가 거의 없어서 어떤 문제가 생기면 처리하는 것이 쉽지가 않았다. 하지만 스트레스를 받으면서도 계속 방법을 찾다보면 언젠가는 답을 찾게 된다.
+
