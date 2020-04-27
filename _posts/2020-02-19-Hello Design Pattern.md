@@ -109,6 +109,65 @@ School* Company::CreateBigSchool(SchoolBuilder &builder){
 
 이와 같이 구현을 하면 SchoolBuilder의 서브클래스의 구현에 따라 기능을 다르게 구현하는 것이 가능하며 사용자 입장에서는 어떤 방식으로 Room이 생성되는지에 대한 정보를 알 수가 없기 떄문에 캡슐화가 된다고 볼 수 있다. 세부적인 사항을 BigSchoolBuilder와 같이 구현해줌으로써 SchoolBuilder 내부의 메소드들에 대한 세부사항을 구현할 수 있다. 빌더는 추상 팩토리랑 비슷한 기능을 하지만 추상 팩토리는 유사성을 토대로 설계에 집중을 한 반면 빌더는 순차적으로 생성을 마친 뒤 마지막 순간에 객체에 대한 정보를 반환한다는 점이 다르다. 
 
+### 팩토리(Factory)
+
+사용자가 만든 프로그램이 다양한 종류의 문서를 다룰 수 있는 프레임워크를 제공한다고 할 때 Application이라는 클래스와 Document라는 클래스로 크게 추상화를 할 수 있다. 그리고 이 추상화 클래스들은 추상 클래스이기 때문에 그에 따른 구현을 서브클래스에 위임하게 된다. 예를 들어서 text와 관련된 문서일 경우 TextApplication과 TextDocument 클래스 등이 정의 되어야 한다. 여기서 TextApplication은 text와 관련된 Document를 관리하는 역할을, TextDocument는 객체를 생성하는 역할을 주로 담당할 것이다. 이런 경우에 어떤 타입의 문서를 처리하는가에 따라 서브 클래스의 종류가 달라지기 때문에 어떤 종류의 문서를 생성해야 하는지 모르게 된다. 이런 경우에 팩토리 메소드를 사용하여 서브클래스 중 어느 것을 생성해야 되는지에 대한 정보를 캡슐화한다. 그 후 Application의 서브 클래스는 추상화된 메소드를 재정의하여 올바른 Document의 서브 클래스를 그에 맞게 반환하도록 한다. 이런 상황에서 CreateDocument와 같은 연산을 팩토리 메소드라고 하는데 이 의미는 객체를 생성하는 방법을 알고 있다는 의미이다.
+
+팩토리 메서드는 다음의 경우에 사용된다.
+
+1. 클래스가 생성해야되보조 서브클래스는 객체에 대한 클래스를 예측하지 못하는 경우
+2. 생성할 객체에 대한 책임을 서브클래스가 지정하도록 하고 싶을 경우
+3. 객체의 생성 책임을 보조 서브클래스 중 하나에 위임하고 어떤 서브클래스가 위임자인지에 대한 정보를 모듈화 하고 싶은 경우
+
+![팩토리](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/design_pattern/factory.png)
+
+위 패턴에서 Product는 팩토리 메서드가 생성하게 되는 객체의 인터페이스를 의미하며 ConcreteProduct는 Product의 클래스에 정의된 인터페이스의 실제 구현 부분이다. Creator는 Product 객체를 반환하는 팩토리 메소드이며 여기서는 ConcreteProduct 객체를 반환한다. ConcreteCreator는 팩토리 메소드를 재정의하여 올바른 Product를 가진 ConcreteProduct 인스턴스를 반환해주는 역할을 수행한다.
+
+이렇게 구현하게 되면 특정 클래스가 여러 코드에 종속적이지 않게 구현이 가능하다. 또한 Product에 정의된 인터페이스에 대한 동작만 구현되기에 어떤 ConcreteProduct일지라도 동작을 한다는 장점이 있다. 하지만 이런 구현때문에 하나의 새로운 타입이 생성될 때마다 그에 맞는 Creator 클래스를 서브클래싱해야 된다. 책의 예제를 보면 다음과 같다.
+
+```c++
+class MazeGame {
+public:
+	Maze* CreateMaze();
+
+	virtual Maze* MakeMaze() const{
+		return new Maze;
+	}
+	virtual Room* MakeRoom(int n) const{
+		return new Room(n);
+	}
+}
+```
+
+위 코드에서 MakeMaze, MakeRoom이 팩토리 메소드이다. 각각의 메소드는 미로의 구성 요소의 한 파트를 반환한다. 
+
+```c++
+Maze* MazeGame::CreateMaze(){
+	Maze* aMaze = MakeMaze();
+
+	Room* r1 = MakeRoom(1);
+	Room* r2 = MakeRoom(2);
+	Door* theDoor = MakeDoor(r1,r2);
+}
+```
+
+위와 같이 팩토리 메소드를 활용하여 생성이 가능하다. 다른 타입의 미로일 경우 아래와 같이 만들어주면 된다.
+
+```c++
+class BombedMazeGame : public MazeGame {
+public:
+	BombedMazeGame();
+
+	virtual Room* MakeRoom(int n) const{
+		return new RoomWithBomb(n);
+	}
+}
+```
+
+기존의 타입을 상속받아 주요 부분들을 재정의 하게 되면 MazeGame의 서브클래스들이 각각의 특성에 의거하여 재정의되어 다양성이 보장된다.
+
+
+
 
 
 
