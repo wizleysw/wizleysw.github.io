@@ -166,8 +166,63 @@ public:
 
 기존의 타입을 상속받아 주요 부분들을 재정의 하게 되면 MazeGame의 서브클래스들이 각각의 특성에 의거하여 재정의되어 다양성이 보장된다.
 
+### 원형(Prototype)
 
+원형 패턴은 독립적은 제품을 만들때 사용된다.
 
+1. 인스턴스화할 클래스를 동적 로딩 상황에서 지정할 때
+2. 클래스의 인스턴스들이 서로 다른 상태 조합 중에 하나일 경우, 미리 원형으로 초기화 해두고 복제해서 사용하는게 수동적으로 초기화하는 것보다 편리할 때
+
+![프로토타입](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/design_pattern/prototype.png)
+
+Prototype은 자신을 복제하는데 필요한 인터페이스의 정의를 나타내며 ConcretePrototype은 복제와 관련된 메소드를 구현한다. Client는 원형에 복제를 요청하여 새로운 객체의 생성을 수행한다.
+
+이런 특징 덕분에 실행 중에 새로운 제품을 추가/삭제 할 수 있다는 장점이 있다. 또한 객체에 대한 변수값을 지정함으로써 새로운 행위를 하도록 할 수 있다. 즉, 새로운 클래스를 동적으로 정의할 수 있다는 의미이다. 또한 이런 방식으로 인하여 서브클래스의 개수를 줄일 수 있다는 것도 장점이다. 
+
+```c++
+class MazePrototypeFactory : public MazeFactory {
+public:
+	MazePrototypeFactory(Maze*, Room*);
+
+	virtual Maze* MakeMaze() const;
+	virtual Room* MakeRoom(int n) const;
+
+private:
+	Maze* _prototypeMaze;
+	Room* _prototypeRoom;
+}
+```
+
+위의 Factory는 생성자가 원형을 인자로 받도록 한다.
+
+```c++
+MazePrototypeFactory::MazePrototypeFactory(
+	Maze* m, Room* r){
+	_prototypeMaze = m;
+	_prototypeRoom = r;
+}
+```	
+
+그리고 생성자에서 원형을 기반으로 초기화를 수행한다. 방을 만드는 것 같은 행위들은 원형을 Clone한 뒤 초기화하는 작업을 의미한다.
+
+```c++
+Room* MazePrototypeFactory::MakeRoom() const{
+	return _prototypeRoom->Clone();
+}
+
+Door* MazePrototypeFactory::MakeDoor(Room* r1, Room* r2) const{
+	Door* door = _prototypeDoor->Clone();
+	door->Initialize(r1,r2);
+	return door;
+}
+```
+
+미로의 종류를 바꾸는 것은 원형을 다른 방식으로 초기화를 하면 된다.
+
+```c++
+MazePrototypeFactory bombedMazeFactory(
+	new Maze, new BombedWall);
+```
 
 
 
