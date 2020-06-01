@@ -20,8 +20,8 @@ toc : true
 
 1. graphQL로 API 구현하기
 2. JAVA로 안드로이드 개발
-3. redis 사용해보기
-4. 네이버/카카오 계정 로그인 구현
+3. 네이버/카카오 계정 로그인 구현
+4. redis 사용해보기
 
 이 전 프로젝트의 주제였던 eaten-Away 서비스를 만드는 과정에서 REST로 api 서버를 설계하였었다. GET, POST 등의 HTTP 메소드와 연동하는 부분이 편리하고 좋았지만 비슷한 기능을 가진 여러 기능들이 각각 매칭이 되어야한다는 불편함이 있었다. 이런 몇가지 불편함을 해소하기 위해서 facebook에서 graphQL을 고안하였다고 하는데 직접 사용을 해보면서 어떤 점이 개선이 되었는지를 비교해보고 싶었다. JAVA의 경우 앞서 말했듯이 Spring으로 개발을 할 프로젝트가 준비되어 있기 때문에 이를 위해서 미리 JAVA를 숙달한다는 의미가 있는 것 같다. (여담이지만 알고리즘에 대한 다른 사람의 풀이를 보면 C++ 뿐만 아니라 JAVA로 작성된 코드들이 많은데 책 한권 봤다고 이해가 되더라.) redis 같은 경우는 캐시 서버?? 관련 개념으로 자주 등장하는 것 같은데 아무래도 개발초보다 보니 멀티 쓰레드/DB/캐시 관련 지식이 부족하다보니 왜 저런 애들이 추가로 쓰이는지가 궁금하였다. 그래서 만약 안드로이드 개발에 사용될 수 있다면 한 번 같이 사용해보는 것도 괜찮다고 생각이 들었다. 마지막으로 네이버/카카오 계정 로그인 구현의 경우 요즘 대부분의 앱들이 따로 회원가입을 처리하지 않고 해당 api를 사용하기도 하고, 회원가입 및 개인정보와 관련된 부분을 덜 신경쓸 수 있다는 점에서 사용을 해보기로 마음먹었다. 어차피 클론코딩이고 어플에서도 api로 구현하긴 하였다.
 
@@ -1864,7 +1864,7 @@ build.gradle에 Implementation을 추가한 뒤 아래와 같이 layout에서 �
                 new SimpleDateFormat("yyyyMMdd_HHmmss",
                         Locale.getDefault()).format(new Date());
         String imageFileName = "IMG_" + timeStamp + "_";
-//        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        // File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
 
         File storageDir  = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "aintstagram");
         if(!storageDir.exists()) storageDir.mkdirs();
@@ -1899,7 +1899,7 @@ case R.id.button_to_camera:
             }
 
             if(photoFile != null){
-//                                    Uri photoUri = FileProvider.getUriForFile(MainActivity.this, "com.ssg.aintstagram.fileprovider", photoFile);
+                // Uri photoUri = FileProvider.getUriForFile(MainActivity.this, "com.ssg.aintstagram.fileprovider", photoFile);
                 intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 Uri photoUri = Uri.fromFile(photoFile);
                 intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
@@ -2053,7 +2053,7 @@ mutation upload_profile($img:Upload!, $kakaoID:Int!){
 }
 ```
 
-java코드도 기존과 동일하다. 조금 다른 점이 있다면 FileUpload 타입으로 iamge를 지정해주어야 된다. 이 때 File에 대한 인자로 imageFilePath가 들어가게 되는데 절대경로를 따서 넣어주면 된다. 이렇게 요청을 보내면 정상적으로 처리가 될 경우 profile에 대한 정보가 최신화 되는 것을 확인할 수 있다.
+java코드도 기존과 동일하다. 조금 다른 점이 있다면 FileUpload 타입으로 image를 지정해주어야 된다. 이 때 File에 대한 인자로 imageFilePath가 들어가게 되는데 절대경로를 따서 넣어주면 된다. 이렇게 요청을 보내면 정상적으로 처리가 될 경우 profile에 대한 정보가 최신화 되는 것을 확인할 수 있다.
 
 ```java
 OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
@@ -2077,5 +2077,1384 @@ apolloClient.mutate(uploadProfile).enqueue(new ApolloCall.Callback<Upload_profil
     });
 ```            
 
-아무래도 java - graphql 도 드문 조합이고 graphql - django 도 드물기 때문에 레퍼런스가 거의 없어서 어떤 문제가 생기면 처리하는 것이 쉽지가 않았다. 하지만 스트레스를 받으면서도 계속 방법을 찾다보면 언젠가는 답을 찾게 된다.
+아무래도 java - graphql 도 드문 조합이고 graphql - django 도 드물기 때문에 레퍼런스가 거의 없어서 어떤 문제가 생기면 처리하는 것이 쉽지가 않았다. 하지만 스트레스를 받으면서도 계속 방법을 찾다보면 언젠가는 답을 찾게 된다. 그리고 결국 기본 구현을 완성을 하였고 다시금 여기서부터 기록을 남기도록 하겠다.
+
+### Fragment로 사용자 이미지 RecyclerView 처리하기
+
+안드로이드에서는 액티비티 내부에 프래그먼트라는 것을 둘 수가 있다. 이를 직관적으로 설명해보자면 렌즈와 같다. 액티비티라는 큰 틀을 가진 하나의 안경틀에 색깔이 다른 프래그먼트를 끼움으로써 다른 기능을 수행하도록 할 수 있는 것이다. 액티비티 내부에 FrameLayout을 설정하고 조건에 따라 프래그먼트를 스위치하면서 다른 역할을 하는 여러 창들을 하나의 Activity에 바인딩하는 것이 가능하다. 그리고 이런 프래그먼트들은 각각 Fragment Life Cycle을 가지며 이는 액티비티와 비슷하게 동작한다. 
+
+RecyclerView는 ScrollView와 ListView를 적절하게 섞어놓은 새로운 View 개념인데 기존의 단점을 보완한 형태이다. 사용해본 결과 장점을 2개를 뽑아보자면 기존의 ListView와 달리 Layout을 세로 가로 등의 형태로 구현이 가능하다는 점과 ViewHolder를 의무로 사용해야 되므로 ViewHolder에 대한 재활용을 통하여 많은 양의 데이터를 사용하더라도 ListView보다 성능면에서 우위를 점한다는 점이었다. 처음 개발해본 입장에서 onClick 이벤트등을 처리하는 방법에 대한 메뉴얼이 잘 보이지 않아서 많이 헤매었지만 한 번 성공한 뒤로는 비슷한 디자인 패턴으로 활용을 하다보니 쉽게 활용이 가능했다. 가장 좋았던 것은 아이템 뷰의 방향을 가로뿐만 아니라 세로로도 지정할 수 있다는 점을 들 수 있겠다.
+
+```xml
+implementation 'androidx.recyclerview:recyclerview:1.1.0'
+```
+
+사용을 위해서는 dependencies에 위와 같이 recyclerview를 추가해주어야 된다. 그리고 recyclerView에서 사용할 adapter는 다음과 같다. 
+
+```java
+public class ProfileRecyclerAdapter extends RecyclerView.Adapter<ProfileRecyclerAdapter.ItemViewHolder>  {
+    private Context context;
+    private ArrayList<Album> albums;
+    private OnPostListener onPostListener;
+
+    public ProfileRecyclerAdapter(ArrayList<Album> albums, Context context, OnPostListener onPostListener){
+        this.albums = albums;
+        this.context = context;
+        this.onPostListener = onPostListener;
+    }
+
+    public static class ItemViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+        ImageView imageView;
+
+        OnPostListener onPostListener;
+
+        public ItemViewHolder(View itemView, OnPostListener onPostListener){
+            super(itemView);
+
+            imageView = (ImageView) itemView.findViewById(R.id.imgview_picture);
+
+            this.onPostListener = onPostListener;
+            itemView.setOnClickListener(this);
+
+        }
+
+        @Override
+        public void onClick(View v) {
+            onPostListener.onPostClick(getAdapterPosition());
+        }
+    }
+
+    public ItemViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType){
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.layout_post_img,parent,false);
+        return new ItemViewHolder(view, onPostListener);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull ItemViewHolder holder, int position){
+        holder.imageView.setImageBitmap(albums.get(position).getImg());
+    }
+
+    @Override
+    public int getItemCount(){
+        return albums.size();
+    }
+
+    public void setItems(ArrayList<Album> albums){
+        this.albums = albums;
+    }
+
+    public interface OnPostListener{
+        void onPostClick(int pos);
+    }
+}
+
+```
+
+위의 어댑터는 Profile 정보를 뿌려주기 위해 사용되는데 onCreateViewHolder가 호출이 되면 ItemViewHolder의 생성자가 호출이 되면서 layout_post_img 레이아웃 상에 존재하는 뷰에 대한 할당을 진행한다. 위의 예제에서는 imageView에 대한 정보를 가져온 뒤, itemView 자체에 onClickListener를 추가해준다. 그리고 이 onClick이벤트는 OnPostListener 인터페이스에 정의된 onPostClick 이벤트를 발생시키는데 getAdapterPostion의 결과를 넘김으로써 adapter에서 몇 번째 viewHolder를 가리키는지를 결과로 돌려준다. Bind 될 시 onBindViewHolder가 호출이 되면서 생성시 정의된 imageView의 이미지를 바꿔주는 역할을 수행한다. 
+
+```java
+
+public class ProfileFragment extends Fragment {
+    RecyclerView v_recycle;
+    ProfileRecyclerAdapter adapter;
+    ArrayList<Album> albums = new ArrayList<>();
+    ArrayList<String> album_urls = new ArrayList<>();
+    ArrayList<Integer> records = new ArrayList<>();
+    private String Token;
+    int cnt;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        super.onCreateView(inflater, container, savedInstanceState);
+        View view = inflater.inflate(R.layout.fragment_profile, container, false);
+        return view;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        v_recycle = (RecyclerView) view.findViewById(R.id.recycle_pic);
+
+        LinearLayoutManager linearLayoutManager = new GridLayoutManager(getActivity(), 4);
+        v_recycle.setLayoutManager(linearLayoutManager);
+
+        album_urls = new ArrayList<>();
+
+        final OkHttpClient okHttpClient2 = new OkHttpClient.Builder().build();
+        ApolloClient apolloClient2 = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient2).build();
+
+        Token = Session.getCurrentSession().getTokenInfo().getAccessToken();
+        final PictureTypeQuery p = PictureTypeQuery.builder().accessToken(Token).build();
+
+        apolloClient2.query(p).enqueue(new ApolloCall.Callback<PictureTypeQuery.Data>() {
+            @Override
+            public void onResponse(@NotNull Response<PictureTypeQuery.Data> response) {
+                cnt = response.data().pics().size();
+
+                for (int i = 0; i < cnt; i++) {
+                    String album_url = getString(R.string.media_url) + response.data().pics().get(i).pic;
+                    Integer record_idx = response.data().pics().get(i).recordId;
+                    album_urls.add(album_url);
+                    records.add(record_idx);
+                }
+
+                try {
+                    addAlbum();
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                Thread mThread = new Thread() {
+                    public void run() {
+                        try {
+                            getActivity().runOnUiThread(new Runnable() {
+                                public void run() {
+                                    ProfileRecyclerAdapter.OnPostListener mPostListener = new ProfileRecyclerAdapter.OnPostListener() {
+                                        @Override
+                                        public void onPostClick(int pos) {
+                                            int record = albums.get(pos).getRecord();
+                                            String username = ((ProfileActivity)getActivity()).username;
+                                            Intent userPostIntent = new Intent(getActivity(), UserPostActivity.class);
+                                            userPostIntent.putExtra("username", username);
+                                            userPostIntent.putExtra("pos", pos);
+                                            userPostIntent.putExtra("record", record);
+                                            startActivity(userPostIntent);
+                                        }
+                                    };
+
+                                    adapter = new ProfileRecyclerAdapter(albums, getContext(), mPostListener);
+                                    v_recycle.setAdapter(adapter);
+                                }
+                            });
+                        } catch (Exception e) {
+                        }
+                    }
+                };
+
+                mThread.start();
+            }
+
+
+            @Override
+            public void onFailure(@NotNull ApolloException e) {
+
+            }
+        });
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+    }
+
+    @Override
+    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+    }
+
+    private void addAlbum() throws ExecutionException, InterruptedException {
+        for(int i=0; i<cnt; i++) {
+            String album_url = album_urls.get(i);
+            Bitmap bitmap = Glide
+                    .with(getActivity())
+                    .asBitmap()
+                    .load(album_url)
+                    .submit().get();
+            albums.add(new Album(bitmap, records.get(i)));
+        }
+    }
+}
+
+```
+
+위의 Fragment는 ProfileActivity내부에서 동작할 프래그먼트에 대한 정의로 onCreate부터 시작하는 Activity와 다르게 onCreateView부터 라이프 사이클이 시작하게 된다. 마찬가지로 layout을 가져와 inflate를 진행한 뒤 onViewCreated에 생성시 진행할 동작을 정의한다. 이 부분에서 recyclerView에 대한 처리가 이루어지는데 해당 부분이 그에 해당된다. 
+
+```java
+v_recycle = (RecyclerView) view.findViewById(R.id.recycle_pic);
+
+LinearLayoutManager linearLayoutManager = new GridLayoutManager(getActivity(), 4);
+v_recycle.setLayoutManager(linearLayoutManager);
+```
+
+v_recycle은 리사이클러뷰를 가져온 것이며 linearLayoutManager로 선언된 해당 부분을 통해 어떤식으로 RecyclerView를 표현할 것인지를 정하게 된다. 해당 예제에서는 Grid 형태로 한 줄에 4개의 아이템만을 가지도록 설정을 한 것이며 다른 조건을 넣게 되면 가로 또는 세로의 형태로 리스트 뷰를 생성할 수 있다. 이렇게 생성된 레이아웃 매니저를 v_recycle에 붙힘으로써 표현하는 방법에 대한 정의가 끝나게 된다. apolloclient 부분에서는 서버로부터 정보를 가져와 처리하는 부분으로 뷰처리를 하는 부분은 다음과 같다.
+
+```java
+ProfileRecyclerAdapter.OnPostListener mPostListener = new ProfileRecyclerAdapter.OnPostListener() {
+    @Override
+    public void onPostClick(int pos) {
+        int record = albums.get(pos).getRecord();
+        String username = ((ProfileActivity)getActivity()).username;
+        Intent userPostIntent = new Intent(getActivity(), UserPostActivity.class);
+        userPostIntent.putExtra("username", username);
+        userPostIntent.putExtra("pos", pos);
+        userPostIntent.putExtra("record", record);
+        startActivity(userPostIntent);
+    }
+};
+
+adapter = new ProfileRecyclerAdapter(albums, getContext(), mPostListener);
+v_recycle.setAdapter(adapter);
+```
+
+onClickEvent를 발생시키기 위해서 OnPostListener 인터페이스를 생성하였었다. onPostClick은 사용자가 RecyclerView의 특정 위치의 아이템을 눌렀을 때 처리할 절차를 정의하기 위해 사용되는데 pos라는 파라미터가 getAdapterPosition의 결과로 몇 번째 인덱스에서 클릭 이벤트가 발생하였는지를 알려준다. 해당 인덱스를 기준으로 처리할 내용을 구현하였는데 record 번호를 가져와 해당 Post 정보를 보여주는 액티비티를 실행하는데 사용된다. 
+
+이렇게 mPostListener가 정의가 되면 adapter를 생성하는데 앞서 정의한 adapter를 RecyclerView에 추가하기만 하면 된다. 
+
+```java
+public class ProfileActivity extends FragmentActivity {
+    private FragmentManager fragmentManager;
+    private ProfileFragment fragmentA;
+    private FragmentTransaction transaction;
+
+    private RecyclerView v_recycle;
+    private ProfileRecyclerAdapter adapter;
+
+    String[] PERMISSIONS = {
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.READ_EXTERNAL_STORAGE,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+    };
+
+    @SuppressLint("StringFormatInvalid")
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_profile);
+
+        setBtn();
+
+        fragmentManager = getSupportFragmentManager();
+        fragmentA = new ProfileFragment();
+        transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.frame_A, fragmentA).commitAllowingStateLoss();
+
+    }
+```    
+
+Fragment의 경우 Activity에서 FragmentManager를 생성한 뒤 beginTransaction을 통해 화면에 표현할 수 있다. 그리고 replace를 통해 Fragment을 갈아끼우는 것이 가능하다.
+
+
+![profile](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/ProfileActivity.png)
+
+
+### 검색기능 구현하기
+
+검색 기능은 다른 사용자의 닉네임을 검색함으로써 존재하는지 여부를 쿼리하여 뿌려주는 부분을 의미하는데 해당 부분을 구현을 위해 SearchResultFrament를 추가하였다. 
+
+```java
+
+public class SearchResultFragment extends Fragment{
+    RecyclerView v_recycle;
+    private SearchRecyclerAdapter adapter;
+    private ArrayList<SearchCard> cards = new ArrayList<>();
+    private String Token;
+    private int cnt;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        super.onCreateView(inflater, container, savedInstanceState);
+        View view = inflater.inflate(R.layout.fragment_search_result, container, false);
+        return view;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        v_recycle = (RecyclerView) view.findViewById(R.id.recycle_card);
+
+    }
+
+    public void RenewView(String input){
+        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getActivity(), LinearLayoutManager.VERTICAL, false);;
+        v_recycle.setLayoutManager(linearLayoutManager);
+
+        cards.clear();
+
+        final OkHttpClient okHttpClient2 = new OkHttpClient.Builder().build();
+        ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient2).build();
+        Token = Session.getCurrentSession().getTokenInfo().getAccessToken();
+        final UserTypeQuery p = UserTypeQuery.builder().name(input).accessToken(Token).search(1).build();
+
+        apolloClient.query(p).enqueue(new ApolloCall.Callback<UserTypeQuery.Data>() {
+            @Override
+            public void onResponse(@NotNull Response<UserTypeQuery.Data> response) {
+                cnt = response.data().users().size();
+
+                for (int i = 0; i < cnt; i++) {
+                    String profile_url = getString(R.string.media_url) + response.data().users().get(i).profile;
+                    String name =  response.data().users().get(i).name;
+                    String comment = response.data().users().get(i).textComment;
+                    Bitmap bitmap = null;
+                    try {
+                        bitmap = Glide
+                                .with(getActivity())
+                                .asBitmap()
+                                .load(profile_url)
+                                .submit().get();
+                    } catch (Exception e) {
+                        bitmap = ((BitmapDrawable)getResources().getDrawable(R.drawable.userinfo)).getBitmap();
+                    }
+                    cards.add(new SearchCard(bitmap, name, comment));
+                }
+
+                Thread mThread = new Thread() {
+                    public void run() {
+                        try {
+                            getActivity().runOnUiThread(new Runnable() {
+                                public void run() {
+                                    SearchRecyclerAdapter.OnCardListener mCardListener = new SearchRecyclerAdapter.OnCardListener() {
+                                        @Override
+                                        public void onCardClick(int pos) {
+                                            String name = cards.get(pos).getName();
+
+                                            Intent profileIntent = new Intent(getContext().getApplicationContext(), SearchResultProfileActivity.class);
+                                            profileIntent.putExtra("username", name);
+                                            startActivity(profileIntent);
+
+                                        }
+                                    };
+
+                                    adapter = new SearchRecyclerAdapter(cards, getContext(), mCardListener);
+                                    v_recycle.setAdapter(adapter);
+                                }
+                            });
+                        } catch (Exception e) {
+                        }
+                    }
+                };
+
+                mThread.start();
+
+            }
+
+            @Override
+            public void onFailure(@NotNull ApolloException e) {
+
+            }
+        });
+    }
+}
+```
+
+전체적인 그림은 Profile쪽과 비슷한데 UserTypeQery를 사용해서 해당 이름이 포함되어있는 유저에 대한 List를 돌려받아 cards에 추가해 준뒤 click이벤트와 함께 정의해주었다. 이제 문제는 어떻게 query할 이름정보를 가져오는가에 달려있다. 
+
+```java
+
+public class SearchActivity extends FragmentActivity {
+    private static final int REQUEST_TAKE_ALBUM = 2;
+    private ImageButton btn_add;
+    private ImageButton btn_profile;
+    private ImageButton btn_home;
+    private ImageButton btn_search;
+    private ImageButton btn_history;
+    private Button btn_cancel;
+    private EditText searchBar;
+
+    private FragmentManager fragmentManager;
+    private SearchResultFragment fragmentB;
+    private FragmentTransaction transaction;
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_search);
+
+        fragmentManager = getSupportFragmentManager();
+        fragmentB = new SearchResultFragment();
+        transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.frame_search, fragmentB).commitAllowingStateLoss();
+
+        searchBar = (EditText) findViewById(R.id.search_bar);
+        searchBar.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                Button cancel = (Button) findViewById(R.id.button_cancel);
+                if(hasFocus){
+                    cancel.setVisibility(VISIBLE);
+                } else {
+                    cancel.setVisibility(View.INVISIBLE);
+                }
+            }
+        });
+
+        searchBar.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                // 입력 전
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                fragmentB.RenewView(s.toString());
+                // 입력되는 중
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                // 입력 완료
+            }
+        });
+
+        setBtn();
+    }
+}
+
+```
+
+Fragment의 본체가 되는 Activity 부분을 보면 EditText인 searchBar 부분에 TextWatcher를 추가하였다. 이를 통하여 입력 이벤트가 발생할 때마다 fragment의 RenewView 메소드가 호출이 되며 그 인자 값으로 사용자의 입력값 데이터가 넘어가서 graphql로의 쿼리가 전송된다. 이를 통해 실시간으로 사용자의 입력 결과를 토대로 사용자조회가 가능하다.
+
+
+![search](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/Search.png)
+
+이렇게 가져온 정보를 입력하면 다음과 같이 해당 유저의 정보를 확인할 수 있다.
+
+![friend](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/Friend.png)
+
+### RecyclerView에 OnClick 인터페이스 구현하기
+
+위의 코드에서 언급이 되긴 하였지만 이를 구현하는데 시간을 꽤 소모하였기에 다시 한번 남기자면 RecyclerView에 사용할 adapter를 생성하는 과정에서 onClickListener를 추가할 수 있다.
+
+```java
+View.OnClickListener listener = new View.OnClickListener(){
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()){
+            case R.id.btn_edit_post:
+                onPostListener.onPostClick(getAdapterPosition(), 1);
+                break;
+            case R.id.btn_heart:
+                onPostListener.onPostClick(getAdapterPosition(), 2);
+                break;
+            case R.id.btn_comment:
+            case R.id.comments:
+                onPostListener.onPostClick(getAdapterPosition(), 3);
+                break;
+            case R.id.btn_message:
+                onPostListener.onPostClick(getAdapterPosition(), 4);
+                break;
+            case R.id.post_img:
+                onPostListener.onPostClick(getAdapterPosition(), 5);
+        }
+    }
+        };
+```            
+
+하지만 여기서 구현의 핵심은 Activity 또는 Fragment에서 해당 이벤트에 대한 처리를 진행하기 위해서는 포지션에 대한 정보를 알고 있어야 한다는 점이다. 이를 위해서 내부적으로 getAdapterPosition을 호출한 결과를 넘겨주어야 되는데 이를 어떤식으로 넘겨줄까에 대한 고민을 많이 하였었다. 
+
+```java
+public interface OnPostListener{
+    void onPostClick(int pos, int choice);
+
+    void onCommentTyped(int pos, Editable value);
+}
+```    
+
+생각한 방법은 인터페이스를 구현하는 것이다. 인터페이스를 구현하여 그 처리부분에 대한 정의를 Activity 또는 Fragment에서 정의해주면 되는 것이었다.
+
+```java
+PostRecyclerAdapter.OnPostListener onPostListener = new PostRecyclerAdapter.OnPostListener() {
+    @Override
+    public void onPostClick(final int pos, int choice) {
+        switch(choice){
+            case 0:
+                String name = posts.get(pos).getName();
+                Intent profileIntent = new Intent(getApplicationContext(), SearchResultProfileActivity.class);
+                profileIntent.putExtra("username", name);
+                startActivity(profileIntent);
+                break;
+            case 1:
+                
+                break;
+            case 2:
+                
+                break;
+            case 3:
+                    
+                break;
+            case 4:
+           
+                break;
+            case 5:
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + choice);
+        }
+    }
+
+    @Override
+    public void onCommentTyped(int pos, Editable value) {
+        int record = posts.get(pos).get_post_id();
+        addComment(record, String.valueOf(value));
+    }
+};
+
+adapter = new PostRecyclerAdapter(posts, getApplicationContext(), onPostListener);
+v_recycle.setAdapter(adapter);
+```  
+
+위와 같이 adapter에 추가해주기 전에 인터페이스의 메소드들을 구현해주게 되면 activity에서 position의 정보를 가진 pos 파라미터와 어떤 이벤트로 인해 들어왔는지를 알려주는 choice라는 정보를 토대로 작업을 수행할 수 있다. 작업의 예로는 어떤 버튼에 대한 처리를 구현한다던지, 다른 인텐트를 수행한다던지 하는 것들이 포함된다고 할 수 있다.                               
+
+### Constraint Layout 동적으로 VISIBILITY 설정하기
+
+이 부분은 같은 레이아웃을 사용하는데 본인인 경우와 본인이 아닌 경우에 버튼 등에 대한 레이아웃을 변경해야 될 경우 사용되었다. 아래의 예제는 ProfileActivity에서 본인일 경우 프로필 수정 버튼을 표시하지만 그 외의 사용자의 경우 팔로우 버튼을 표시하도록 변경하는 것이다. 
+
+```java
+runOnUiThread(new Runnable(){
+    public void run(){
+        ImageView v_profile = (ImageView)findViewById(R.id.user_profile);
+        v_profile.setImageBitmap(bitmap);
+
+        if(myKakaoId != searchKakaoId) {
+            btn_follow = (Button) findViewById(R.id.button_follow);
+            btn_follow.setVisibility(View.VISIBLE);
+            btn_msg = (Button) findViewById(R.id.button_message);
+            btn_msg.setVisibility(View.VISIBLE);
+            btn_edit = (Button) findViewById(R.id.button_edit_profile);
+            btn_edit.setVisibility(View.GONE);
+            ConstraintSet constraintSet = new ConstraintSet();
+            ConstraintLayout constraintLayout = findViewById(R.id.profile);
+            constraintSet.clone(constraintLayout);
+            constraintSet.connect(R.id.my_pics, ConstraintSet.TOP, R.id.button_follow, ConstraintSet.BOTTOM, 0);
+            constraintSet.connect(R.id.others_pics, ConstraintSet.TOP, R.id.button_message, ConstraintSet.BOTTOM, 0);
+            constraintSet.applyTo(constraintLayout);
+
+            setRenewedButton();
+            getFollowInfo();
+        }
+
+    }
+});
+```
+
+레이아웃에 대한 처리는 UI Thread에서만 진행하여야 하기 때문에 runOnUiThread를 호출하여 수행하며 위와 같이 ConstraintSet을 정의하여 connect 등의 함수로 재정의 하는 과정을 수행하면 된다. 
+
+### 팔로우/언팔로우 기능 구현하기
+
+팔로우와 언팔로우 기능을 구현하기 위해서는 graphql에 Mutation 엔드포인트를 추가해주어야 된다. addFollow, unFollow라는 이름의 클래스를 생성하였다. 
+
+```python
+class addFollow(graphene.Mutation):
+    success = graphene.Boolean()
+
+    class Arguments:
+        accessToken = graphene.String(required=True)
+        fkakaoID = graphene.Int(required=True)
+
+    def mutate(self, info, accessToken, fkakaoID):
+        kakaoID = get_kakaoID(accessToken)
+        if kakaoID is None:
+            return addFollow(success=False)
+
+        if kakaoID == fkakaoID:
+            return addFollow(success=False)
+
+        try:
+            user_from = UserModel.objects.get(kakaoID=kakaoID)
+            user_to = UserModel.objects.get(kakaoID=fkakaoID)
+        except:
+            return addFollow(success=False)
+
+        history = FollowModel.objects.filter(user_from__kakaoID=kakaoID, user_to__kakaoID=fkakaoID)
+        if history.exists():
+            return addFollow(success=False)
+
+        else:
+            follow = FollowModel(user_from=user_from, user_to=user_to)
+            follow.save()
+
+            addHistory = HistoryModel(user=user_to, type='F', record_id=follow.follow_id)
+            addHistory.save()
+
+            user_to.follower_count += 1
+            user_to.save()
+
+            user_from.following_count += 1
+            user_from.save()
+            return addFollow(success=True)
+```
+
+addFollow의 경우 인자로 accessToken과 fkakaoID를 받는데 accessToken을 토대로 사용자가 존재하는지를 검사한 뒤 타 사용자의 kakaoID와 비교하여 본인일 경우에는 success를 false로 돌려주며 끝내게 된다. 만약 FollowModel 정보가 존재하지 않을 경우 팔로우 정보를 추가해주며 상대방의 follower_count 정보를 더해주고 본인의 following_count 정보를 업데이트한다. 
+
+```python
+class unFollow(graphene.Mutation):
+    success = graphene.Boolean()
+
+    class Arguments:
+        accessToken = graphene.String(required=True)
+        fkakaoID = graphene.Int(required=True)
+        choice = graphene.Int()
+
+    def mutate(self, info, accessToken, fkakaoID, choice=None):
+        kakaoID = get_kakaoID(accessToken)
+        if kakaoID is None:
+            return addFollow(success=False)
+
+        if kakaoID == fkakaoID:
+            return addFollow(success=False)
+
+        try:
+            if choice == None:
+                user_from = UserModel.objects.get(kakaoID=kakaoID)
+                user_to = UserModel.objects.get(kakaoID=fkakaoID)
+                history = FollowModel.objects.filter(user_from__kakaoID=kakaoID, user_to__kakaoID=fkakaoID)
+                if not history.exists():
+                    return addFollow(success=False)
+            else:
+                user_from = UserModel.objects.get(kakaoID=fkakaoID)
+                user_to = UserModel.objects.get(kakaoID=kakaoID)
+                history = FollowModel.objects.filter(user_from__kakaoID=fkakaoID, user_to__kakaoID=kakaoID)
+                if not history.exists():
+                    return addFollow(success=False)
+        except:
+            return addFollow(success=False)
+
+        else:
+            history.delete()
+
+            user_to.follower_count -= 1
+            user_to.save()
+
+            user_from.following_count -= 1
+            user_from.save()
+            return addFollow(success=True)
+```
+
+unFollow도 addFollow와 비슷한 패턴인데 choice 정보에 따라 follow 또는 following 정보를 지우며 성공할 경우 정보를 업데이트 하고 success를 참으로 리턴해준다. 
+
+```graphql
+mutation add_follow($fkakaoID:Int!, $accessToken:String!){
+    addFollow (fkakaoID:$fkakaoID, accessToken:$accessToken){
+        success
+    }
+}
+```
+
+graphql에는 다음과 같이 추가해주고 아래와 같이 사용하면 된다.
+
+```java
+public void setRenewedButton(){
+    View.OnClickListener mListener = new View.OnClickListener() {
+        @SuppressLint("IntentReset")
+        @Override
+        public void onClick(View v) {
+            switch(v.getId()){
+                case R.id.button_follow:
+                    if(btn_follow.getText() == "팔로우"){
+                        final OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+                        final ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+                        final Add_followMutation f = Add_followMutation.builder().accessToken(Token).fkakaoID(searchKakaoId).build();
+                        apolloClient.mutate(f).enqueue(new ApolloCall.Callback<Add_followMutation.Data>() {
+                            @Override
+                            public void onResponse(@NotNull Response<Add_followMutation.Data> response) {
+                                getUserProfile();
+                                runOnUiThread(new Runnable() {
+                                    public void run() {
+                                        Toast.makeText(getApplicationContext(), "요청을 완료하였습니다.", Toast.LENGTH_LONG).show();
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onFailure(@NotNull ApolloException e) {
+
+                            }
+                        });
+                    } else {
+                        final OkHttpClient okHttpClient2 = new OkHttpClient.Builder().build();
+                        final ApolloClient apolloClient2 = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient2).build();
+                        final Un_followMutation u = Un_followMutation.builder().accessToken(Token).fkakaoID(searchKakaoId).build();
+                        apolloClient2.mutate(u).enqueue(new ApolloCall.Callback<Un_followMutation.Data>() {
+                            @Override
+                            public void onResponse(@NotNull Response<Un_followMutation.Data> response) {
+                                getUserProfile();
+                                runOnUiThread(new Runnable() {
+                                    public void run() {
+                                        Toast.makeText(getApplicationContext(), "요청을 완료하였습니다.", Toast.LENGTH_LONG).show();
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onFailure(@NotNull ApolloException e) {
+
+                            }
+                        });
+                    }
+                    break;
+            }
+        }
+    };
+    btn_follow.setOnClickListener(mListener);
+};
+```
+
+![follows](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/Follow.png)
+
+
+### Filterable 인터페이스 Recyclerview에 적용하기
+
+Filterable은 RecyclerView에서 특정 키워드로 검색을 하기 위하여 사용되었으며 Follower/Following 리스트에서 특정 키워드로 검색하는 기능을 위해 추가되었다.
+
+```java
+
+public class FollowingRecyclerAdapter extends RecyclerView.Adapter<FollowingRecyclerAdapter.ItemViewHolder> implements Filterable {
+    private Context context;
+    private ArrayList<FollowCard> cards;
+    private OnCardListener onCardListener;
+
+    ArrayList<FollowCard> unFilteredlist;
+    ArrayList<FollowCard> filteredList;
+
+    ... 생략 ...
+
+    @Override
+    public Filter getFilter() {
+        return new Filter() {
+            @Override
+            protected FilterResults performFiltering(CharSequence constraint) {
+                String charString = constraint.toString();
+                if(charString.isEmpty()) {
+                    filteredList = unFilteredlist;
+                } else {
+                    ArrayList<FollowCard> filteringList = new ArrayList<>();
+                    for(int i=0; i<unFilteredlist.size(); i++) {
+                        if(unFilteredlist.get(i).getName().toLowerCase().contains(charString.toLowerCase())) {
+                            filteringList.add(unFilteredlist.get(i));
+                        }
+                    }
+                    filteredList = filteringList;
+                }
+                FilterResults filterResults = new FilterResults();
+                filterResults.values = filteredList;
+                return filterResults;
+            }
+
+            @Override
+            protected void publishResults(CharSequence constraint, FilterResults results) {
+                filteredList = (ArrayList<FollowCard>)results.values;
+                setItem(filteredList);
+                notifyDataSetChanged();
+            }
+        };
+    }
+
+}
+```
+
+adapter에 Filterable 인터페이스를 추가하여 getFilter 부분을 오버라이딩 하였다. constraint로 들어온 문자열을 토대로 getName()을 한 값에 해당 문자열이 포함되어 있을 경우에 filteringList에 추가해주며 작업이 완료되면 해당 결과를 setItem한 뒤 notifyDataChanged를 호출하여 RecyclerView가 최신화되도록 한다.
+
+```java
+searchBar = (EditText) findViewById(R.id.search_bar);
+
+searchBar.addTextChangedListener(new TextWatcher() {
+    @Override
+    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        // 입력 전
+    }
+
+    @Override
+    public void onTextChanged(CharSequence s, int start, int before, int count) {
+        switch(choice){
+            case 1:
+                followerFragment.filterSeq(s);
+                break;
+            case 2:
+                followingFragment.filterSeq(s);
+        }
+
+    }
+
+    @Override
+    public void afterTextChanged(Editable s) {
+    }
+});
+```        
+
+EditText부분에 사용자 검색과 마찬가지로 onTextChanged 부분을 오버라이딩 하여 filterSeq를 호출하면 된다.
+
+### Post의 정보 업데이트 하기
+
+Post부분을 구현하기 위해서는 사용자가 follow하는 모든 사용자의 Post 정보를 시간순으로 가져와야 된다. 그리고 그와 연관된 Like, Comment등에 대한 정보를 graphql에 요청하여 가져와야 된다. 
+
+```java
+public void getPosts(){
+    posts = new ArrayList<>();
+    threads = new ArrayList<>();
+
+    final OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+    final ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+    Token = Session.getCurrentSession().getTokenInfo().getAccessToken();
+
+    final PostTypeQuery q = PostTypeQuery.builder().accessToken(Token).build();
+
+    apolloClient.query(q).enqueue(new ApolloCall.Callback<PostTypeQuery.Data>() {
+        @RequiresApi(api = Build.VERSION_CODES.O)
+        @Override
+        public void onResponse(@NotNull Response<PostTypeQuery.Data> response) {
+            int cnt = response.data().posts().size();
+
+            for(int i=0; i<cnt; i++){
+                String name = response.data().posts().get(i).user().name;
+                String place = response.data().posts().get(i).place;
+                String profile = getString(R.string.media_url) + response.data().posts().get(i).user().profile;
+                Integer postId = Integer.parseInt(response.data().posts().get(i).postId);
+                int likes = response.data().posts().get(i).likeCount;
+                int comments = response.data().posts().get(i).commentCount;
+                String textComment = response.data().posts().get(i).textComment;
+                String dt = response.data().posts().get(i).date.toString();
+                ZonedDateTime zdt = ZonedDateTime.parse(dt);
+                ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
+                long days = Duration.between(zdt ,now).toDays();
+                long hours = Duration.between(zdt, now).toHours();
+                long mins = Duration.between(zdt, now).toMinutes();
+
+                if(days>=1) {
+                    posts.add(new Post(name, place, postId, textComment, likes, String.valueOf(days) + " 일", comments));
+                } else if(hours>=1){
+                    posts.add(new Post(name, place, postId, textComment, likes, String.valueOf(hours) + " 시간", comments));
+                } else {
+                    posts.add(new Post(name, place, postId, textComment, likes, String.valueOf(mins) + " 분", comments));
+                }
+
+                threads.add(new ImgUrlThread(i, postId, profile));
+            }
+```                
+
+getPosts는 서버로부터 Post에 대한 정보를 가져오는데 PostModel은 해당 사용자의 이미지를 주지 않으며 보는 사용자가 해당 게시글에 좋아요를 눌렀는지 등에 대한 정보를 주지 않는다. 
+
+```python
+posts = PostModel.objects.filter(user__name=UserModel.objects.get(kakaoID=kakaoID))
+for following in list(FollowModel.objects.filter(user_from__kakaoID=kakaoID).values("user_to_id")):
+    posts |= PostModel.objects.filter(user__name=UserModel.objects.get(user_id=following["user_to_id"]))
+return posts.order_by('date').reverse()
+```
+
+그리하여 이를 처리하기 위해서는 추가적인 작업이 필요하다. 이를 위해 Runnable 인터페이스를 implements한 커스텀 쓰레드를 생성하였다. 커스텀으로 생성함으로 가질 수 있는 이점은 Thread가 업데이트 해야될 index에 대한 정보를 가질 수 있다는 점이며 백그라운드에서 작업을 수행할 수 있다는 점을 들 수 있다. 
+
+```java
+public class ImgUrlThread implements Runnable {
+    private String url;
+    private String profile_url;
+    private int idx;
+    private Integer record;
+
+    public ImgUrlThread(int idx, Integer record, String profile_url){
+        this.idx = idx;
+        this.record = record;
+        this.profile_url = profile_url;
+    }
+
+    @Override
+    public void run() {
+        getImageUrl(record);
+
+        try {
+            addPostProfileImage(profile_url);
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        checkLike();
+        checkPostUser();
+    }
+
+    private void getImageUrl(int record) {
+        final OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+        final ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+
+        final PictureTypeQuery q = PictureTypeQuery.builder().accessToken(Token).record(record).build();
+
+        apolloClient.query(q).enqueue(new ApolloCall.Callback<PictureTypeQuery.Data>() {
+            @Override
+            public void onResponse(@NotNull Response<PictureTypeQuery.Data> response) {
+                url = "http://10.0.2.2:8000/media/" + response.data().pics().get(0).pic;
+                try {
+                    addPostImage(url);
+
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public void onFailure(@NotNull ApolloException e) {
+
+            }
+        });
+    }
+
+    private void addPostImage(String url) throws ExecutionException, InterruptedException {
+        Bitmap bitmap = Glide
+                .with(getApplicationContext())
+                .asBitmap()
+                .load(url)
+                .submit().get();
+
+        posts.get(idx).set_post_img(bitmap);
+
+        NotifyRunnable runnable = new NotifyRunnable();
+        runnable.setIdx(idx);
+        runOnUiThread(runnable);
+    }
+
+    private void addPostProfileImage(String url) throws ExecutionException, InterruptedException {
+        Bitmap bitmap = null;
+        try {
+            bitmap = Glide
+                    .with(getApplicationContext())
+                    .asBitmap()
+                    .load(url)
+                    .submit().get();
+        } catch (Exception e) {
+            bitmap = ((BitmapDrawable)getResources().getDrawable(R.drawable.userinfo)).getBitmap();
+        }
+
+        posts.get(idx).set_profile_img(bitmap);
+
+        NotifyRunnable runnable = new NotifyRunnable();
+        runnable.setIdx(idx);
+        runOnUiThread(runnable);
+    }
+
+    private void checkLike() {
+        final OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+        final ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+
+        final LikeTypeQuery l = LikeTypeQuery.builder().accessToken(Token).typeinfo("P").record(record).build();
+        apolloClient.query(l).enqueue(new ApolloCall.Callback<LikeTypeQuery.Data>() {
+            @Override
+            public void onResponse(@NotNull Response<LikeTypeQuery.Data> response) {
+                if(response.data().likes().size() == 1) {
+                    posts.get(idx).set_like_status(true);
+                } else {
+                    posts.get(idx).set_like_status(false);
+                }
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        adapter.notifyItemChanged(idx);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(@NotNull ApolloException e) {
+
+            }
+        });
+    }
+
+    private void checkPostUser(){
+        final OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+        final ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+
+        final PostTypeQuery p = PostTypeQuery.builder().accessToken(Token).record(record).build();
+        apolloClient.query(p).enqueue(new ApolloCall.Callback<PostTypeQuery.Data>() {
+            @Override
+            public void onResponse(@NotNull Response<PostTypeQuery.Data> response) {
+                if(response.data().posts().size() >= 1) {
+                    posts.get(idx).setMine(true);
+                } else {
+                    posts.get(idx).setMine(false);
+                }
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        adapter.notifyItemChanged(idx);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(@NotNull ApolloException e) {
+
+            }
+        });
+    }
+}
+```
+
+ImgUrlThread는 여러가지 작업을 처리하는데 그 순서를 간략하게 정리하자면 다음과 같다. Post를 올린 사용자의 프로필 정보를 받아와 set_profile_img를 호출하여 최신화 한다. checkLike를 호출하여 본인이 해당 게시글에 좋아요를 누른 상태인지를 확인한 뒤 누른 상태이면 하트의 색상을 변경한다. 해당 Post를 업로드한 본인이라면 포스트의 수정 또는 삭제를 하기 위해 누르게 되는 버튼에 대한 VISIBILITY를 처리한다.
+
+그리고 작업이 끝나면 adapter에 notifyItemChanged를 호출함으로써 정보를 업데이트 하게 된다. 해당 코드를 작성하는 과정에서 imgUrlThread에 대한 ArrayList를 생성하여 처리하였는데 만약 그 과정에서 레이스 컨디션이 발생하면 null 에러가 발생할 수 있다. 그리하여 위의 코드는 그리 좋은 예제라고는 할 수 없지만 안드로이드를 처음하는 지금의 입장에서 고치기보다는 좀 더 익숙해지게 되면 다시 돌아와 고치는 편이 더 좋을 것 같다. 아직도 갈 길이 멀다..
+
+
+![post](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/Post.png)
+
+
+### RecyclerView 특정 위치로 이동시키기
+
+ProfileActivity에서 사용자의 특정 사진을 클릭하면 해당 사용자의 Post만을 담고 있는 RecyclerView의 특정 부분으로 이동하게 된다. 이를 어떻게 구현하면 될까 고민을 했었는데 다음과 같이 해결이 가능하다.
+
+```java
+adapter = new PostRecyclerAdapter(posts, getApplicationContext(), onPostListener);
+v_recycle.setAdapter(adapter);
+v_recycle.scrollToPosition(post_pos);
+```
+
+scrollToPosition으로 해결하엿다!
+
+### CommentActivity 구현하기 
+
+댓글 부분에서는 대부분 받아오고 서버로 요청하는 부분이 대부분이기 때문에 특별히 다른 점을 찾아보라면 OnKeyListener를 들 수 있겠다. 사용자가 댓글을 작성을 완료하면 해당 event의 콜백부분을 수행하는 과정에서 서버로 요청을 하게 하면 된다. 
+
+```java
+new_comment.setOnKeyListener(new ReplyCommentListener(parent));
+new_comment.requestFocus();
+```
+
+new_comment라는 이름의 EditText에 ReplyCommentListener를 달아주는데 OnKeyListener를 커스터마이징 한 클래스이다. 
+
+```java
+ public class ReplyCommentListener implements View.OnKeyListener{
+        Integer parent;
+
+        public ReplyCommentListener(Integer parent){
+            this.parent = parent;
+        }
+
+        @Override
+        public boolean onKey(View v, int keyCode, KeyEvent event) {
+            if ((event.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)) {
+                String comment = String.valueOf(new_comment.getText());
+                if (comment.substring(0) != "\n") {
+                    OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+                    ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+
+                    String Token = Session.getCurrentSession().getTokenInfo().getAccessToken();
+                    if(this.parent == null){
+                        final Add_commentMutation addComment = Add_commentMutation.builder().accessToken(Token).record(comments.get(0).get_post_id()).text(comment).build();
+                        apolloClient.mutate(addComment).enqueue(new ApolloCall.Callback<Add_commentMutation.Data>() {
+                            @Override
+                            public void onResponse(@NotNull Response<Add_commentMutation.Data> response) {
+                                if (response.data().addComment.success) {
+                                    new_comment.getText().clear();
+
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            new_comment.clearFocus();
+                                        }
+                                    });
+
+                                    InputMethodManager imm = (InputMethodManager) getApplicationContext().getSystemService(Activity.INPUT_METHOD_SERVICE);
+                                    imm.hideSoftInputFromWindow( new_comment.getWindowToken(), 0);
+
+                                    getCommentsList();
+                                }
+                            }
+
+                            @Override
+                            public void onFailure(@NotNull ApolloException e) {
+                                e.printStackTrace();
+                                Toast.makeText(getApplicationContext(), "알 수 없는 이유로 실패하였습니다.", Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    } else {
+                        final Add_commentMutation addComment = Add_commentMutation.builder().accessToken(Token).record(comments.get(0).get_post_id()).parent(this.parent).text(comment).build();
+                        apolloClient.mutate(addComment).enqueue(new ApolloCall.Callback<Add_commentMutation.Data>() {
+                            @Override
+                            public void onResponse(@NotNull Response<Add_commentMutation.Data> response) {
+                                if (response.data().addComment.success) {
+                                    new_comment.getText().clear();
+
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            new_comment.clearFocus();
+                                        }
+                                    });
+
+                                    InputMethodManager imm = (InputMethodManager) getApplicationContext().getSystemService(Activity.INPUT_METHOD_SERVICE);
+                                    imm.hideSoftInputFromWindow( new_comment.getWindowToken(), 0);
+
+                                    getCommentsList();
+                                }
+                            }
+
+                            @Override
+                            public void onFailure(@NotNull ApolloException e) {
+                                e.printStackTrace();
+                                Toast.makeText(getApplicationContext(), "알 수 없는 이유로 실패하였습니다.", Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    }
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
+    }
+```
+
+Comment에서 parent는 답글에 대한 답글인지를 판단하는 여부이기 떄문에 해당 값이 null인 경우 게시물 자체에 대한 댓글로 간주한다. onKey이벤트가 발생하면 사용자가 작성한 댓글을 parent와 같은 값을 토대로 build하여 전송한다. 만약 해당 요청이 성공하여 success값이 참으로 돌아온 경우 new_comment에 적혀있는 글을 clear한 뒤, clearFocus를 수행하고 keyboard를 숨기고 Comment에 대한 정보를 최신화해주는 getCommentsList를 호출하게 된다.
+
+
+![comment](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/CommentActivity.png)
+
+
+### History 서비스 구현하기
+
+History는 팔로우/팔로잉/좋아요/댓글 등의 이벤트가 발생하면 사용자에게 알림을 주기 위해 필요한 기능이다. 백그라운드에서 지속적으로 돌아야 되기 때문에 Service로 구현을 하였다.
+
+```java
+
+public class HistoryService extends Service implements Runnable{
+    private NotificationManager mNM;
+
+    private int NOTIFICATION = 5;
+
+    public class LocalBinder extends Binder {
+        HistoryService getService(){
+            return HistoryService.this;
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        mNM  = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        showNotification("Welcome to aintstagram");
+
+        Thread mThread = new Thread(this);
+        mThread.start();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return super.onStartCommand(intent, flags, startId);
+    }
+
+    @Override
+    public void onDestroy() {
+        mNM.cancel(NOTIFICATION);
+    }
+
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) {
+        return mBinder;
+    }
+
+    private final IBinder mBinder = new LocalBinder();
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void showNotification(CharSequence text){
+        PendingIntent intent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), 0);
+
+        NotificationChannel channel = new NotificationChannel("aintstagram", text, IMPORTANCE_DEFAULT);
+        mNM.createNotificationChannel(channel);
+
+        Notification notification = new Notification.Builder(this, "aintstagram")
+                .setSmallIcon(R.drawable.aintstagram)
+                .setTicker(text)  // the status text
+                .setWhen(System.currentTimeMillis())  // the time stamp
+                .setContentTitle("aintstagram")  // the label of the entry
+                .setContentText(text)  // the contents of the entry
+                .setContentIntent(intent)
+                .build();
+
+        mNM.notify(NOTIFICATION, notification);
+    }
+
+    public void updateHistory(int record){
+        final OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+        final ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+        String Token = Session.getCurrentSession().getTokenInfo().getAccessToken();
+
+        final Update_history_seenMutation uh = Update_history_seenMutation.builder().accessToken(Token).record(record).build();
+        apolloClient.mutate(uh).enqueue(new ApolloCall.Callback<Update_history_seenMutation.Data>() {
+            public void onResponse(@NotNull Response<Update_history_seenMutation.Data> response) {
+
+            }
+
+            @Override
+            public void onFailure(@NotNull ApolloException e) {
+
+            }
+        });
+    }
+
+    public void checkHistory(){
+        final OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+        final ApolloClient apolloClient = ApolloClient.builder().serverUrl(getString(R.string.api_url)).okHttpClient(okHttpClient).build();
+        String Token = Session.getCurrentSession().getTokenInfo().getAccessToken();
+
+        final HistoryTypeQuery h = HistoryTypeQuery.builder().accessToken(Token).build();
+        apolloClient.query(h).enqueue(new ApolloCall.Callback<HistoryTypeQuery.Data>() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
+            @Override
+            public void onResponse(@NotNull Response<HistoryTypeQuery.Data> response) {
+                int cnt = response.data().histories.size();
+                for(int i=0; i<cnt; i++){
+                    Integer record = Integer.parseInt(response.data().histories.get(i).historyId);
+                    if (!response.data().histories.get(i).seen) {
+                        switch (response.data().histories.get(i).type){
+                            case C:
+                                showNotification("새로운 댓글이 있습니다.");
+                                updateHistory(record);
+                                break;
+                            case F:
+                                showNotification("새로운 팔로우가 추가되었습니다.");
+                                updateHistory(record);
+                                break;
+                            case L:
+                                showNotification("새로운 좋아요 정보가 있습니다.");
+                                updateHistory(record);
+                                break;
+                            case $UNKNOWN:
+                                break;
+                        }
+                    }
+
+
+                }
+            }
+
+            @Override
+            public void onFailure(@NotNull ApolloException e) {
+
+            }
+        });
+    }
+
+    @Override
+    public void run() {
+        while(true){
+            try{
+                checkHistory();
+                Thread.sleep(10000);
+            } catch(Exception e){
+
+            }
+        }
+    }
+
+}
+```
+
+서비스도 라이프 사이클을 가지고 있는데 onCreate로부터 시작이 되는 것은 Activity와 동일하다. 서비스는 백그라운드에서 작업을 하며 브로드캐스트와 다르게 메모리에 대한 정리가 필요한 경우 종료되기도 한다. 
+
+
+```java
+mNM  = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+showNotification("Welcome to aintstagram");
+```        
+
+해당 부분은 사용자에게 Welcome to aintstagram이라는 메시지 알람을 띄우는 부분이며 서비스가 실행되는 동안에는 한 번만 호출이 된다. 
+
+
+![alarm](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/alarm.png)
+
+
+showNotification 부분에서는 알림에 대한 이름 등의 설정을 진행하게 되며 run 부분을 통해 Thread는 10초마다 checkHistory를 실행하게 된다. 
+
+checkHistory는 서버로부터 새로 알려야 할 History 정보가 존재하는지 요청하게 되는데 만약 존재할 경우 해당 타입에 대한 정보를 토대로 알림을 보낸 뒤 updateHistory를 요청하게 된다. updateHistory는 알림을 수행하였다는 결과를 서버에 알려주기 위함이며 해당 요청이 서버로 전달이 되게 되면 checkHistory에서 더 이상 같은 레코드 값이 넘어오지 않게 된다. 
+
+```java
+Intent historyService = new Intent(getApplicationContext(), HistoryService.class);
+startService(historyService);
+```        
+
+service도 Intent를 통해 실행할 수 있으며 startService로 호출을 하는 순간 실행되게 된다. 
+
+
+![history](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/history.png)
+
+
+### SMS 최신화 
+
+타 사용자와 메시지를 주고 받는 경우에는 나로 인해 발생하는 변화와 상대방으로 발생하는 변화를 모두 캐치할 수 있어야 된다. 나로 인해 발생하는 전송/메시지 삭제의 경우 안드로이드가 알 수 있기 때문에 바로 최신화를 수행하면 되지만 상대방으로 인해 발생한 변화에 대해서는 서버에 요청하여 알아내는 과정이 필요하다. 
+
+어떤 방식으로 구현할 수 있을지에 대해 고민을 하다가 다음과 로직을 생각했다. 첫 번째는 누군가 특정 메시지를 삭제한 뒤 요청한 쿼리의 경우 메시지의 총량이 다르다는 점이다. 두 번째로는 만약 메시지를 삭제한 동시에 새로운 메시지가 추가되어 총량이 같은 경우에는 마지막에 추가된 메시지의 레코드 번호는 반드시 다르다는 것이다. 삭제된 만큼 추가가 되었음에도 마지막 레코드의 값이 같은 경우는 존재할 수 없기 때문이다. 이런 특징을 이용하여 Thread를 구현하였다. Thread는 2초마다 diffMessage를 호출하는데 MessageType을 쿼리하여 총량이 다르거나 마지막 레코드의 번호가 다른 경우에 update를 수행하도록 하였다.
+
+```java
+class MessageDiffThread extends Thread implements Runnable {
+        private String username;
+        private int chatId;
+        private int last_idx;
+        private int prev_cnt;
+        private int cur_cnt;
+
+        public MessageDiffThread(int chatId, String username, int last_idx, int prev_cnt){
+            this.chatId = chatId;
+            this.username = username;
+            this.last_idx = last_idx;
+            this.prev_cnt = prev_cnt;
+        }
+
+        @Override
+        public void run() {
+            while(true) {
+                diffMessage();
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        private void diffMessage(){
+            final OkHttpClient okHttpClient = new OkHttpClient.Builder().build();
+            final ApolloClient apolloClient = ApolloClient.builder().serverUrl("http://10.0.2.2:8000/graphql/").okHttpClient(okHttpClient).build();
+            String Token = Session.getCurrentSession().getTokenInfo().getAccessToken();
+
+            final MessageTypeQuery m = MessageTypeQuery.builder().accessToken(Token).username(username).build();
+
+            apolloClient.query(m).enqueue(new ApolloCall.Callback<MessageTypeQuery.Data>() {
+                @Override
+                public void onResponse(@NotNull Response<MessageTypeQuery.Data> response) {
+                    cur_cnt = response.data().messages().size();
+                    int new_last_idx = Integer.parseInt(response.data().messages().get(cur_cnt-1).messageId);
+
+                    if(prev_cnt != cur_cnt){
+                        getMessages();
+                        prev_cnt = cur_cnt;
+                        last_idx = new_last_idx;
+                    }
+
+                    else if(new_last_idx != last_idx){
+                        getMessages();
+                        last_idx = new_last_idx;
+                    }
+                }
+
+                @Override
+                public void onFailure(@NotNull ApolloException e) {
+                }
+            });
+        }
+    }
+```
+
+![sms](https://raw.githubusercontent.com/wizleysw/wizleysw.github.io/master/_posts/img/aintstagram/MessageActivity.png)
+
+
+### GITHUB LINK
+
+사실 여기까지 진행하는데 딱 2달이라는 시간이 걸렸다. 안드로이드 프로젝트가 처음이었고 자바프로그래밍이 처음이었으며 graphql 또한 처음이었다. 개발을 진행하는 동안 수많은 문제에 봉착하였으며 해결하기 위해 많은 노력을 기울였다. 그리고 그 과정에서 스스로 해결해야 되는 문제들도 존재했으며 공식 문서를 봤지만 전혀 모르겠었던 문제들도 존재하였다. 그리고 구현이 완료된 지금도 해결하지 못하고 있는 여러 이슈들이 존재한다. 하지만 그 과정에서 많은 것을 배울 수 있었고 가장 유명한 어플을 스스로 도움없이 구현할 수 있었다는 점에서 이번 프로젝트는 성공하였다고 생각한다. 다만 안드로이드 개발을 더 잘하고 싶은 욕심이 생겨서 아마 다른 사람이 개발한 어떤 앱의 코드를 그대로 따라하며 나와 어떤 방식이 다른지에 대한 연구를 해보고자 한다. 
+
+안드로이드를 개발하면서 가장 힘들었던 부분이 비동기 처리를 하는 부분이었다. null 관련 에러가 발생하기 쉬운 환경이기 때문에 속도 및 로직에 대한 부분에서 많은 실수가 있었고 이를 해결하는게 쉽지 않았다. 그래도 익숙해질수록 비슷한 구현이 필요한 부분에 대한 구현 속도가 빨라진다는 점에서 숙련도가 늘고 있다는 것을 체감할 수 있었다. 클론 코딩으로 진행하기에 좀 어렵지 않았나라는 생각을 했지만 결국 구현이 가능하다는 것을 이렇게 증명할 수 있어서 한편으로는 좋았던 프로젝트 주제였다고 생각한다. 
+
+포스팅에는 생략된 부분이 정말 많았지만 구현을 하는 동안 정말 많은 코드를 작성하였다. 그리고 그 기록에 대한 부분은 아래의 깃링크에서 확인이 가능하다. 각각의 커밋에 대해서 설명을 달아놨으니 참고해보면 좋을 듯 하다.
+
+[aintstagram 결과물](https://github.com/wizleysw/aintstagram)
 
