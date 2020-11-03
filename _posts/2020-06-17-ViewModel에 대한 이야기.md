@@ -12,7 +12,7 @@ toc : true
 
 ## OverView
 
-안드로이드의 LifeCycle을 공부하다보면 드는 여러 의문가운데 하나가 로테이션과 관련된 것이다. 예를 들어 사용자가 화면을 가로에서 세로로 전환하게 된 경우에 발생하는 상황에 관한 것인데 LifeCycle에 따르면 onDestroy가 호출되고 새로 호출되는 Activity에서 layout이 inflate 되게 된다.
+안드로이드의 LifeCycle을 공부하다보면 드는 여러 의문 가운데 하나가 로테이션과 관련된 것이다. 예를 들어 사용자가 화면을 가로에서 세로로 전환하게 된 경우에 발생하는 상황에 관한 것인데 LifeCycle에 따르면 onDestroy가 호출되고 새로 호출되는 Activity에서 layout이 inflate 되게 된다.
 
 ### OnSavedInstanceState ??
 
